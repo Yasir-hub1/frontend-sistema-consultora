@@ -9,6 +9,7 @@ import {
   Fingerprint,
   Briefcase,
   Search,
+  SlidersHorizontal,
 } from 'lucide-react'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
@@ -55,6 +56,35 @@ function cargoLabel(cargo) {
   return CARGO_LABELS[cargo] ?? cargo ?? '—'
 }
 
+const MODULOS_PERMISO = [
+  { key: 'afp', label: 'AFP' },
+  { key: 'caja', label: 'CAJA' },
+  { key: 'ministerio', label: 'Ministerio' },
+]
+
+function buildPermDraft(row) {
+  const permisos = MODULOS_PERMISO.map(({ key: modulo }) => {
+    const cur = Array.isArray(row.permisos_por_modulo)
+      ? row.permisos_por_modulo.find((p) => p.modulo === modulo)
+      : null
+    return {
+      modulo,
+      puede_ver: cur ? Boolean(cur.puede_ver) : true,
+      puede_registrar_personal: Boolean(cur?.puede_registrar_personal),
+      puede_editar_personal: Boolean(cur?.puede_editar_personal),
+      puede_subir_documentos: Boolean(cur?.puede_subir_documentos),
+      puede_eliminar_documentos: Boolean(cur?.puede_eliminar_documentos),
+      puede_gestionar_modulo: Boolean(cur?.puede_gestionar_modulo),
+      puede_exportar_reportes: Boolean(cur?.puede_exportar_reportes),
+      puede_invitar_empresa: Boolean(cur?.puede_invitar_empresa),
+    }
+  })
+  return {
+    puede_editar_empresa_cliente: Boolean(row.puede_editar_empresa_cliente),
+    permisos,
+  }
+}
+
 function estadoBadge(estado, habilitado) {
   if (!habilitado) {
     return (
@@ -83,6 +113,10 @@ export default function ConsultoraMiEquipo() {
   const [msg, setMsg] = useState(null)
   const [toggleBusyId, setToggleBusyId] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [permModalOpen, setPermModalOpen] = useState(false)
+  const [permRow, setPermRow] = useState(null)
+  const [permDraft, setPermDraft] = useState(() => buildPermDraft({ permisos_por_modulo: [] }))
+  const [permSaving, setPermSaving] = useState(false)
 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(PAGINATION_CONFIG.DEFAULT_PAGE_SIZE)
@@ -192,6 +226,43 @@ export default function ConsultoraMiEquipo() {
     else setMsg(res.message)
   }
 
+  const openPermisos = (row) => {
+    setMsg(null)
+    setPermRow(row)
+    setPermDraft(buildPermDraft(row))
+    setPermModalOpen(true)
+  }
+
+  const closePermisos = () => {
+    setPermModalOpen(false)
+    setPermRow(null)
+  }
+
+  const patchPermisoCampo = (idx, campo, valor) => {
+    setPermDraft((d) => ({
+      ...d,
+      permisos: d.permisos.map((p, i) => (i === idx ? { ...p, [campo]: Boolean(valor) } : p)),
+    }))
+  }
+
+  const guardarPermisos = async () => {
+    if (!permRow) return
+    setPermSaving(true)
+    setMsg(null)
+    const res = await consultoraService.updateColaboradorPermisos(permRow.id, {
+      puede_editar_empresa_cliente: permDraft.puede_editar_empresa_cliente,
+      permisos: permDraft.permisos,
+    })
+    setPermSaving(false)
+    if (res.success) {
+      closePermisos()
+      await load()
+      setMsg('Permisos actualizados.')
+    } else {
+      setMsg(res.message)
+    }
+  }
+
   const rangeLabel =
     total === 0
       ? loading
@@ -212,7 +283,8 @@ export default function ConsultoraMiEquipo() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
             Alta de colaboradores con credenciales controladas. El interruptor verde permite el acceso
-            al portal; rojo lo suspende sin borrar el usuario.
+            al portal; rojo lo suspende sin borrar el usuario. Desde «Permisos» defines si pueden editar
+            legajos, registrar personal o la ficha de la empresa cliente.
           </p>
         </div>
         <Button
@@ -375,6 +447,15 @@ export default function ConsultoraMiEquipo() {
                         onToggle={(next) => onToggleAcceso(r, next)}
                       />
                     </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3 w-full !py-2 text-xs"
+                      icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
+                      onClick={() => openPermisos(r)}
+                    >
+                      Permisos de módulos y empresa
+                    </Button>
                   </li>
                 )
               })}
@@ -402,6 +483,9 @@ export default function ConsultoraMiEquipo() {
                     </th>
                     <th scope="col" className="whitespace-nowrap px-4 py-3 text-center font-semibold text-gray-900 dark:text-gray-100">
                       Portal
+                    </th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-center font-semibold text-gray-900 dark:text-gray-100">
+                      Permisos
                     </th>
                   </tr>
                 </thead>
@@ -447,6 +531,19 @@ export default function ConsultoraMiEquipo() {
                               }
                               onToggle={(next) => onToggleAcceso(r, next)}
                             />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-center">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="!py-1.5 !px-2.5 text-xs"
+                              icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
+                              onClick={() => openPermisos(r)}
+                            >
+                              Permisos
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -565,6 +662,89 @@ export default function ConsultoraMiEquipo() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={permModalOpen}
+        onClose={closePermisos}
+        title={permRow ? `Permisos — ${permRow.nombres ?? ''} ${permRow.apellidos ?? ''}`.trim() : 'Permisos'}
+        size="lg"
+        bodyClassName="p-4 sm:p-6 max-h-[85vh] overflow-y-auto"
+      >
+        {permRow ? (
+          <div className="space-y-5">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Los permisos por módulo (AFP, CAJA, Ministerio) se aplican al flujo de documentos y legajo. La
+              opción de empresa permite corregir nombre comercial, NIT, representante y contacto en las
+              empresas asignadas.
+            </p>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+              <input
+                type="checkbox"
+                className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                checked={permDraft.puede_editar_empresa_cliente}
+                onChange={(e) =>
+                  setPermDraft((d) => ({ ...d, puede_editar_empresa_cliente: e.target.checked }))
+                }
+              />
+              <span className="text-sm text-gray-800 dark:text-gray-200">
+                <span className="font-semibold">Editar ficha de empresa cliente</span>
+                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                  Datos generales de la empresa (no incluye credenciales del portal empresa).
+                </span>
+              </span>
+            </label>
+
+            <div className="space-y-4">
+              {permDraft.permisos.map((p, idx) => {
+                const label = MODULOS_PERMISO.find((m) => m.key === p.modulo)?.label ?? p.modulo
+                return (
+                  <div
+                    key={p.modulo}
+                    className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40"
+                  >
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{label}</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {[
+                        ['puede_ver', 'Ver módulo'],
+                        ['puede_registrar_personal', 'Registrar personal'],
+                        ['puede_editar_personal', 'Editar legajo / personal'],
+                        ['puede_subir_documentos', 'Subir documentos'],
+                        ['puede_eliminar_documentos', 'Eliminar documentos'],
+                        ['puede_gestionar_modulo', 'Gestionar trámites del módulo'],
+                        ['puede_exportar_reportes', 'Exportar reportes'],
+                        ['puede_invitar_empresa', 'Invitar / credenciales empresa'],
+                      ].map(([campo, texto]) => (
+                        <label
+                          key={campo}
+                          className="flex cursor-pointer items-center gap-2 text-xs text-gray-700 dark:text-gray-300"
+                        >
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            checked={Boolean(p[campo])}
+                            onChange={(e) => patchPermisoCampo(idx, campo, e.target.checked)}
+                          />
+                          {texto}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" onClick={closePermisos} disabled={permSaving}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={guardarPermisos} disabled={permSaving}>
+                {permSaving ? 'Guardando…' : 'Guardar permisos'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   )

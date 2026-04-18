@@ -2,7 +2,7 @@
  * API colaborador — empresas asignadas, personal, documentos AFP/CAJA/Ministerio (Fases 5–8).
  */
 
-import { get, post, upload } from './api'
+import { get, patch, post, upload } from './api'
 import { MESSAGES, PAGINATION_CONFIG } from '../utils/constants'
 
 function stripEmpty(params) {
@@ -17,6 +17,23 @@ export const colaboradorService = {
   async getDashboard() {
     try {
       const response = await get('/colaborador/dashboard')
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async listAlertas(params = {}) {
+    try {
+      const queryParams = stripEmpty({
+        page: params.page || 1,
+        per_page: params.per_page || PAGINATION_CONFIG.DEFAULT_PAGE_SIZE,
+        resuelta: params.resuelta,
+      })
+      const response = await get('/colaborador/alertas', queryParams)
       if (response.data.success) {
         return { success: true, data: response.data.data, message: response.data.message }
       }
@@ -43,9 +60,12 @@ export const colaboradorService = {
     }
   },
 
-  async listTiposDocumentoModulo(modulo) {
+  async listTiposDocumentoModulo(modulo, params = {}) {
     try {
-      const response = await get(`/colaborador/modulos/${modulo}/tipos-documento`)
+      const query = stripEmpty({
+        caja_variante: params.caja_variante,
+      })
+      const response = await get(`/colaborador/modulos/${modulo}/tipos-documento`, query)
       if (response.data.success) {
         const raw = response.data.data
         return {
@@ -61,6 +81,21 @@ export const colaboradorService = {
         message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
         data: [],
       }
+    }
+  },
+
+  async patchCajaRegimen(empresaClienteId, personalId, regimenCaja) {
+    try {
+      const response = await patch(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}/caja-regimen`,
+        { regimen_caja: regimenCaja }
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
     }
   },
 
@@ -102,6 +137,33 @@ export const colaboradorService = {
       return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
     } catch (error) {
       return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
+  async updatePersonal(empresaClienteId, personalId, payload) {
+    try {
+      const response = await patch(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
+        payload
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
+    }
+  },
+
+  async updateEmpresaAsignada(empresaClienteId, payload) {
+    try {
+      const response = await patch(`/colaborador/empresas-cliente/${empresaClienteId}`, payload)
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
     }
   },
 

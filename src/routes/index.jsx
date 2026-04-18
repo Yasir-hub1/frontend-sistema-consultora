@@ -21,6 +21,7 @@ import ConsultoraMiEquipo from '../pages/consultora/MiEquipo'
 import ConsultoraMisEmpresas from '../pages/consultora/MisEmpresas'
 import ConsultoraEmpresaDetalle from '../pages/consultora/EmpresaClienteDetalle'
 import ConsultoraAlertas from '../pages/consultora/Alertas'
+import ConsultoraCatalogoDocumentos from '../pages/consultora/CatalogoDocumentos'
 
 import ColaboradorDashboard from '../pages/colaborador/Dashboard'
 import ColaboradorEmpresas from '../pages/colaborador/EmpresasAsignadas'
@@ -101,6 +102,7 @@ const AppRoutes = () => {
         <Route path="mis-empresas" element={<ConsultoraMisEmpresas />} />
         <Route path="mis-empresas/:empresaId" element={<ConsultoraEmpresaDetalle />} />
         <Route path="alertas" element={<ConsultoraAlertas />} />
+        <Route path="catalogo-documentos" element={<ConsultoraCatalogoDocumentos />} />
         <Route path="perfil" element={<Perfil />} />
       </Route>
 

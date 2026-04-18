@@ -17,7 +17,9 @@ import Input from '../../components/common/Input'
 import Modal from '../../components/common/Modal'
 import Pagination from '../../components/common/Pagination'
 import { colaboradorService } from '../../services/colaboradorService'
+import { useAuth } from '../../contexts/AuthContext'
 import { PAGINATION_CONFIG } from '../../utils/constants'
+import { ROLES } from '../../utils/roleUtils'
 
 function estadoModuloBadge(estado) {
   const e = String(estado ?? '').toLowerCase()
@@ -47,7 +49,10 @@ function estadoModuloBadge(estado) {
 }
 
 export default function ColaboradorPersonalLista() {
+  const { user } = useAuth()
   const { empresaId } = useParams()
+  const canRegistrarPersonal =
+    user?.rol === ROLES.CONSULTORA || Boolean(user?.colaborador?.puede_registrar_personal)
   const [rows, setRows] = useState([])
   const [empresa, setEmpresa] = useState(null)
   const [stats, setStats] = useState({ total_personal: 0 })
@@ -186,17 +191,24 @@ export default function ColaboradorPersonalLista() {
             )}
           </div>
         </div>
-        <Button
-          type="button"
-          onClick={() => {
-            setMsg(null)
-            setModalOpen(true)
-          }}
-          icon={<UserPlus className="h-4 w-4" />}
-          className="shrink-0"
-        >
-          Registrar personal
-        </Button>
+        {canRegistrarPersonal ? (
+          <Button
+            type="button"
+            onClick={() => {
+              setMsg(null)
+              setModalOpen(true)
+            }}
+            icon={<UserPlus className="h-4 w-4" />}
+            className="shrink-0"
+          >
+            Registrar personal
+          </Button>
+        ) : (
+          <p className="max-w-sm text-xs text-amber-800 dark:text-amber-200/90">
+            No tienes permiso para registrar personal. Pide a la consultora que lo habilite en Mi equipo →
+            Permisos.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -278,9 +290,11 @@ export default function ColaboradorPersonalLista() {
             <p className="mx-auto mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">
               Crea el primer legajo para habilitar los módulos AFP, CAJA y Ministerio de Trabajo.
             </p>
-            <Button type="button" className="mt-5" onClick={() => setModalOpen(true)} icon={<Plus className="h-4 w-4" />}>
-              Registrar empleado
-            </Button>
+            {canRegistrarPersonal ? (
+              <Button type="button" className="mt-5" onClick={() => setModalOpen(true)} icon={<Plus className="h-4 w-4" />}>
+                Registrar empleado
+              </Button>
+            ) : null}
           </div>
         ) : rows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500 dark:border-gray-700">

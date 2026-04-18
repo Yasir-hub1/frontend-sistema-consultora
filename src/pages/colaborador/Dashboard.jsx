@@ -6,6 +6,7 @@ import { colaboradorService } from '../../services/colaboradorService'
 
 export default function ColaboradorDashboard() {
   const [data, setData] = useState(null)
+  const [alertasList, setAlertasList] = useState([])
   const [msg, setMsg] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -13,10 +14,17 @@ export default function ColaboradorDashboard() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const res = await colaboradorService.getDashboard()
+      const [res, resAlertas] = await Promise.all([
+        colaboradorService.getDashboard(),
+        colaboradorService.listAlertas({ resuelta: false, per_page: 5 }),
+      ])
       if (cancelled) return
       if (res.success) setData(res.data)
       else setMsg(res.message)
+      if (resAlertas.success) {
+        const d = resAlertas.data?.data ?? resAlertas.data?.items ?? resAlertas.data ?? []
+        setAlertasList(Array.isArray(d) ? d : [])
+      }
       setLoading(false)
     })()
     return () => {
@@ -25,7 +33,7 @@ export default function ColaboradorDashboard() {
   }, [])
 
   const empresas = data?.empresas_asignadas ?? 0
-  const alertas = data?.alertas_pendientes ?? 0
+  const alertasPendientes = data?.alertas_pendientes ?? 0
 
   return (
     <div className="space-y-6">
@@ -79,10 +87,10 @@ export default function ColaboradorDashboard() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {loading ? '—' : alertas}
+                {loading ? '—' : alertasPendientes}
               </p>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Alertas pendientes</p>
-              {alertas > 0 && (
+              {alertasPendientes > 0 && (
                 <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-500">
                   Revisa con tu consultora o desde el módulo de alertas cuando esté disponible.
                 </p>
@@ -90,6 +98,27 @@ export default function ColaboradorDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Notificaciones recientes</h2>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{alertasList.length} visibles</span>
+        </div>
+        {alertasList.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Sin notificaciones nuevas.</p>
+        ) : (
+          <ul className="space-y-2">
+            {alertasList.map((a) => (
+              <li key={a.id} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
+                <p className="font-medium text-gray-900 dark:text-white">{a.titulo ?? 'Notificación'}</p>
+                {a.descripcion && (
+                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{a.descripcion}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <EmpresasAsignadasPanel variant="embedded" />

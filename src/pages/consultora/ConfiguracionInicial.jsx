@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import toast from 'react-hot-toast'
 import {
   Building2,
   Check,
@@ -56,6 +57,11 @@ function labelTipoCuenta(v) {
 
 function labelMoneda(v) {
   return MONEDA_OPTS.find((o) => o.value === v)?.label ?? v
+}
+
+function firstFormErrorMessage(errors) {
+  const first = Object.values(errors || {})[0]
+  return first?.message || ''
 }
 
 function logoAbsUrl(logoUrl) {
@@ -299,13 +305,25 @@ export default function ConsultoraConfiguracionInicial() {
 
   const saveStep = async (paso, payload) => {
     setStatus(null)
+    const phaseSuccess = {
+      1: 'Identidad guardada correctamente.',
+      2: 'Datos bancarios guardados correctamente.',
+      3: 'Plantilla de entrega guardada correctamente.',
+    }
+    const toastId = toast.loading('Guardando…')
     const res = await consultoraService.guardarPasoConfiguracion(paso, payload)
     if (res.success) {
+      toast.success(phaseSuccess[paso] || 'Guardado correctamente.', { id: toastId })
       setStatus('Guardado correctamente.')
       if (res.data) setConfig(res.data)
       await loadConfig()
       if (paso < 4) setStep(paso + 1)
-    } else setStatus(res.message)
+    } else {
+      toast.error(res.message || 'No se pudo guardar. Revisa los datos e intenta de nuevo.', {
+        id: toastId,
+      })
+      setStatus(res.message)
+    }
   }
 
   const onLogoChange = async (e) => {
@@ -313,15 +331,20 @@ export default function ConsultoraConfiguracionInicial() {
     if (!file) return
     setStatus(null)
     setLogoUploading(true)
+    const toastId = toast.loading('Subiendo logo…')
     const fd = new FormData()
     fd.append('logo', file)
     const res = await consultoraService.subirLogo(fd)
     setLogoUploading(false)
     e.target.value = ''
     if (res.success) {
+      toast.success('Logo subido correctamente.', { id: toastId })
       setStatus('Logo subido.')
       await loadConfig()
-    } else setStatus(res.message)
+    } else {
+      toast.error(res.message || 'No se pudo subir el logo.', { id: toastId })
+      setStatus(res.message)
+    }
   }
 
   const onPaso2 = (d) => {
@@ -335,6 +358,10 @@ export default function ConsultoraConfiguracionInicial() {
   }
 
   const onPaso3 = () => {
+    if (!plantillaCampos.length) {
+      toast.error('Añade al menos un campo a la plantilla de entrega antes de guardar.')
+      return
+    }
     saveStep(3, {
       plantilla_entrega: { campos: plantillaCampos },
     })
@@ -372,22 +399,6 @@ export default function ConsultoraConfiguracionInicial() {
     setPlantillaCampos((prev) =>
       prev.map((c) => (c.id === id ? { ...c, obligatorio: val } : c))
     )
-  }
-
-  const finalizar = async () => {
-    setStatus(null)
-    const res = await consultoraService.finalizarConfiguracion()
-    if (res.success) {
-      setStatus(res.message || 'Consultora activa operativamente.')
-      await loadConfig()
-    } else {
-      const pend = res.errors?.pendientes
-      if (Array.isArray(pend) && pend.length) {
-        setStatus(`${res.message}\n${pend.map((p) => `• ${p}`).join('\n')}`)
-      } else {
-        setStatus(res.message)
-      }
-    }
   }
 
   const f1v = f1.watch()
@@ -428,6 +439,36 @@ export default function ConsultoraConfiguracionInicial() {
 
   const allChecklistOk = checklist.every((c) => c.ok)
 
+  const finalizar = async () => {
+    if (!allChecklistOk) {
+      toast.error('Completa todos los requisitos del resumen antes de activar la consultora.')
+      return
+    }
+    setStatus(null)
+    const toastId = toast.loading('Activando consultora…')
+    const res = await consultoraService.finalizarConfiguracion()
+    if (res.success) {
+      const msg = res.message || 'Consultora activa operativamente.'
+      toast.success(msg, { id: toastId })
+      setStatus(msg)
+      await loadConfig()
+    } else {
+      const pend = res.errors?.pendientes
+      let detail = ''
+      if (Array.isArray(pend) && pend.length) {
+        setStatus(`${res.message}\n${pend.map((p) => `• ${p}`).join('\n')}`)
+        const short = pend.slice(0, 4).join(' · ')
+        detail = pend.length > 4 ? `${short}…` : short
+      } else {
+        setStatus(res.message)
+      }
+      toast.error(
+        `${res.message || 'No se pudo completar la activación.'}${detail ? ` — ${detail}` : ''}`,
+        { id: toastId, duration: 6000 }
+      )
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -464,7 +505,15 @@ export default function ConsultoraConfiguracionInicial() {
       {step === 1 && (
         <Card title="Paso 1 — Identidad" subtitle={STEPS[0].desc}>
           <form
-            onSubmit={f1.handleSubmit((d) => saveStep(1, d))}
+            onSubmit={f1.handleSubmit(
+              (d) => saveStep(1, d),
+              (errors) => {
+                const msg = firstFormErrorMessage(errors)
+                toast.error(
+                  msg ? `Falta completar: ${msg}` : 'Completa los campos obligatorios del paso 1.'
+                )
+              }
+            )}
             className="grid gap-4 sm:grid-cols-2"
           >
             <div className="sm:col-span-2">
@@ -500,11 +549,11 @@ export default function ConsultoraConfiguracionInicial() {
                 </code>
               </p>
             </div>
-            <Input
+            {/* <Input
               label="Nombre comercial"
               {...f1.register('nombre_comercial', { required: 'Obligatorio' })}
               error={f1.formState.errors.nombre_comercial?.message}
-            />
+            /> */}
             <Input label="Color marca" type="color" {...f1.register('color_marca')} />
             <Input
               label="Correo soporte (visible a clientes)"
@@ -526,7 +575,18 @@ export default function ConsultoraConfiguracionInicial() {
 
       {step === 2 && (
         <Card title="Paso 2 — Datos bancarios" subtitle={STEPS[1].desc}>
-          <form onSubmit={f2.handleSubmit(onPaso2)} className="grid gap-4 sm:grid-cols-2">
+          <form
+            onSubmit={f2.handleSubmit(
+              onPaso2,
+              (errors) => {
+                const msg = firstFormErrorMessage(errors)
+                toast.error(
+                  msg ? `Falta completar: ${msg}` : 'Completa los datos bancarios obligatorios.'
+                )
+              }
+            )}
+            className="grid gap-4 sm:grid-cols-2"
+          >
             <div className="sm:col-span-2">
               <label htmlFor="inst-fin" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Institución financiera

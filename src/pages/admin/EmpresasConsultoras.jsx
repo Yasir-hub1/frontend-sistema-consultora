@@ -508,10 +508,10 @@ export default function EmpresasConsultoras() {
                 {...editForm.register('nit', { required: 'Obligatorio' })}
                 error={editForm.formState.errors.nit?.message}
               />
-              <Input
+              {/* <Input
                 label="Nombre comercial"
                 {...editForm.register('nombre_comercial')}
-              />
+              /> */}
               <Input label="Representante legal" {...editForm.register('representante_nombre', { required: 'Obligatorio' })} error={editForm.formState.errors.representante_nombre?.message} />
               <Input label="CI representante" {...editForm.register('representante_ci')} />
               <Input label="Teléfono" {...editForm.register('telefono')} />
@@ -523,7 +523,7 @@ export default function EmpresasConsultoras() {
               />
               <Input label="Ciudad" {...editForm.register('ciudad')} />
               <Input label="Departamento" {...editForm.register('departamento')} />
-              <Input label="Dirección" className="sm:col-span-2" {...editForm.register('direccion')} />
+              {/* <Input label="Dirección" className="sm:col-span-2" {...editForm.register('direccion')} /> */}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Para cambiar la contraseña del titular o bloquear el portal, usa el interruptor en el listado o reestablece credenciales desde acceso de usuario.
