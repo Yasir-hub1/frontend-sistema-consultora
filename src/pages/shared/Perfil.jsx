@@ -10,7 +10,7 @@ const Perfil = () => {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mi perfil</h1>
-      <Card title="Datos de sesión" subtitle="Información asociada a tu usuario en LaboraConsult">
+      <Card title="Datos de sesión" subtitle="Información asociada a tu usuario en Consult-360">
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs font-semibold uppercase text-gray-500">Rol</dt>

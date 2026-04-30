@@ -137,16 +137,19 @@ export default {
         xs: '2px',
       },
       animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'fade-in-up': 'fadeInUp 0.5s ease-out',
-        'slide-in': 'slideIn 0.3s ease-out',
-        'slide-in-right': 'slideInRight 0.3s ease-out',
-        'bounce-in': 'bounceIn 0.6s ease-out',
-        'scale-in': 'scaleIn 0.2s ease-out',
+        'fade-in': 'fadeIn 0.5s ease-in-out both',
+        'fade-in-up': 'fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'fade-in-up-slow': 'fadeInUp 0.75s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'slide-in': 'slideIn 0.3s ease-out both',
+        'slide-in-right': 'slideInRight 0.3s ease-out both',
+        'slide-in-bottom': 'slideInBottom 0.4s cubic-bezier(0.32, 0.72, 0, 1) both',
+        'bounce-in': 'bounceIn 0.6s ease-out both',
+        'scale-in': 'scaleIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both',
         'float': 'float 3s ease-in-out infinite',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'gradient': 'gradient 8s ease infinite',
         'shimmer': 'shimmer 2s linear infinite',
+        'subtle-pulse': 'subtlePulse 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -154,7 +157,7 @@ export default {
           '100%': { opacity: '1' },
         },
         fadeInUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         slideIn: {
@@ -164,6 +167,10 @@ export default {
         slideInRight: {
           '0%': { transform: 'translateX(10px)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        slideInBottom: {
+          '0%': { transform: 'translateY(110%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
         },
         bounceIn: {
           '0%': { transform: 'scale(0.3)', opacity: '0' },
@@ -186,6 +193,10 @@ export default {
         shimmer: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
+        },
+        subtlePulse: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.65' },
         },
       },
       backgroundImage: {

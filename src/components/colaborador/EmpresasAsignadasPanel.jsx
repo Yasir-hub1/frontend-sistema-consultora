@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { clsx } from 'clsx'
 import {
   Briefcase,
   Building2,
@@ -14,6 +15,9 @@ import Card from '../common/Card'
 import Pagination from '../common/Pagination'
 import { colaboradorService } from '../../services/colaboradorService'
 import { PAGINATION_CONFIG } from '../../utils/constants'
+import { staggerDelayMs } from './ColaboradorShell'
+
+const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
 function portalBadge(habilitado) {
   if (habilitado) {
@@ -142,29 +146,35 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
   return (
     <div className="space-y-6">
       {!isEmbedded && statTile && StatIcon && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div
+            className={`group rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-soft-lg dark:border-gray-700/80 dark:bg-gray-900/50 ${motionStagger}`}
+            style={{ animationDelay: `${staggerDelayMs(0)}ms` }}
+          >
             <div className="flex items-center gap-3">
               <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${statTile.iconClass}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105 ${statTile.iconClass}`}
               >
                 <StatIcon className="h-5 w-5" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{statTile.value}</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{statTile.value}</p>
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{statTile.label}</p>
                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-500">{statTile.hint}</p>
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+          <div
+            className={`group rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/60 hover:shadow-soft-lg dark:border-gray-700/80 dark:bg-gray-900/50 dark:hover:border-emerald-900/40 ${motionStagger}`}
+            style={{ animationDelay: `${staggerDelayMs(1)}ms` }}
+          >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition-transform duration-300 group-hover:scale-105 dark:bg-emerald-900/40 dark:text-emerald-300">
                 <Users className="h-5 w-5" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">Personal por empresa</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Personal por empresa</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                   Entra a cada fila para registrar o revisar legajos según tus permisos.
                 </p>
               </div>
@@ -182,15 +192,15 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
         </div>
       )}
 
-      <Card title={isEmbedded ? 'Empresas asignadas' : 'Directorio'} subtitle={rangeLabel}>
+      <Card title={isEmbedded ? 'Empresas asignadas' : 'Directorio'} subtitle={rangeLabel} gradient>
         {isEmbedded && (
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
             Busca por nombre, NIT, correo o ciudad. Usa la paginación para recorrer listas largas.
           </p>
         )}
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="relative max-w-md flex-1">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="relative min-w-0 max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
@@ -221,11 +231,12 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent motion-reduce:animate-none" />
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Cargando empresas…</p>
           </div>
         ) : sinEmpresas ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 py-14 text-center dark:border-gray-700 dark:bg-gray-900/20">
+          <div className="animate-fade-in-up rounded-2xl border border-dashed border-gray-200 bg-gradient-to-b from-gray-50/80 to-white/50 py-14 text-center motion-reduce:animate-none dark:border-gray-700 dark:from-gray-900/40 dark:to-gray-900/20">
             <Briefcase className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" />
             <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
               {typeof stats.asignadas === 'number'
@@ -245,12 +256,16 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
         ) : (
           <>
             <ul className="space-y-3 md:hidden">
-              {rows.map((r) => {
+              {rows.map((r, i) => {
                 const portalOn = r.acceso_portal_habilitado === true
                 return (
                   <li
                     key={r.id}
-                    className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40"
+                    className={clsx(
+                      motionStagger,
+                      'rounded-xl border border-gray-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-primary-800'
+                    )}
+                    style={{ animationDelay: `${staggerDelayMs(i)}ms` }}
                   >
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 dark:text-white">{displayNombre(r)}</p>
@@ -272,7 +287,7 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
                     <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 dark:border-gray-800">
                       <Link
                         to={`${personalBase}/${r.id}/personal`}
-                        className="btn btn-outline btn-sm inline-flex items-center gap-2"
+                        className="btn btn-outline btn-sm inline-flex min-h-[44px] items-center justify-center gap-2 sm:min-h-0"
                       >
                         <ExternalLink className="h-4 w-4" />
                         Ver personal
@@ -283,7 +298,7 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
               })}
             </ul>
 
-            <div className="hidden overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 md:block">
+            <div className="hidden overflow-x-auto overscroll-x-contain touch-pan-x rounded-xl border border-gray-200 shadow-sm dark:border-gray-700 md:block">
               <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-800/90">

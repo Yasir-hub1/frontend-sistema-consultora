@@ -1,17 +1,26 @@
 import EmpresasAsignadasPanel from '../../components/colaborador/EmpresasAsignadasPanel'
+import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 
 export default function ColaboradorEmpresasAsignadas() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Empresas asignadas</h1>
-        <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-          Solo verás empresas cliente que el titular te haya asignado. Busca, pagina y entra al personal de cada
-          una.
-        </p>
-      </div>
+  const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
-      <EmpresasAsignadasPanel variant="page" />
-    </div>
+  return (
+    <ColaboradorShell className="min-w-0">
+      <div className="space-y-6">
+        <div className={`min-w-0 ${motionStagger}`}>
+          <h1 className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-xl font-bold tracking-tight text-transparent sm:text-2xl dark:from-white dark:to-gray-300">
+            Empresas asignadas
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            Solo verás empresas cliente que el titular te haya asignado. Busca, pagina y entra al personal de cada
+            una.
+          </p>
+        </div>
+
+        <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
+          <EmpresasAsignadasPanel variant="page" />
+        </div>
+      </div>
+    </ColaboradorShell>
   )
 }

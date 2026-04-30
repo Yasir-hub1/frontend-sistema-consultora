@@ -1,5 +1,5 @@
 /**
- * API administrador LaboraConsult — registro y seguimiento de empresas consultoras (Fase 1 del flujo).
+ * API administrador Consult-360 — registro y seguimiento de empresas consultoras (Fase 1 del flujo).
  * Misma estructura de petición que el servicio anterior: query limpio, { success, data, message }.
  */
 

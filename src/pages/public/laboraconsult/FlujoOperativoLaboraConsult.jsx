@@ -47,7 +47,7 @@ function FlujoOperativoLaboraConsult() {
       <div className="mx-auto max-w-7xl space-y-6">
         <Card
           className="border border-primary-200/60"
-          title="LaboraConsult - Flujo Operativo Integrado"
+          title="Consult-360 - Flujo Operativo Integrado"
           subtitle="Vista ejecutable de negocio alineada a DB v2, modelos y relaciones del sistema"
           headerClassName="pb-4"
         >

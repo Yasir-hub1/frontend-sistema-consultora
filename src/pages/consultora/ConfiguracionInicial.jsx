@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import {
@@ -8,8 +9,11 @@ import {
   ChevronUp,
   ImagePlus,
   Loader2,
+  Settings2,
+  Sparkles,
   X,
 } from 'lucide-react'
+import { clsx } from 'clsx'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
@@ -91,18 +95,18 @@ function EntregaPreview({
 
   return (
     <div
-      className="mx-auto max-w-3xl rounded-xl border-2 border-gray-200 bg-white p-8 shadow-lg dark:border-gray-600 dark:bg-gray-900"
+      className="mx-auto max-w-3xl rounded-xl border-2 border-gray-200 bg-white p-4 shadow-lg sm:rounded-2xl sm:p-8 dark:border-gray-600 dark:bg-gray-900"
       style={{ borderTopWidth: 4, borderTopColor: colorMarca || '#2563EB' }}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-gray-700">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <div className="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between dark:border-gray-700">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
             Documento de entrega
           </p>
-          <h3 className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+          <h3 className="mt-1 text-lg font-bold text-gray-900 sm:text-xl dark:text-white">
             {nombreMarca || 'Tu consultora'}
           </h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-1 break-words text-xs text-gray-600 sm:text-sm dark:text-gray-400">
             Soporte: {correoSoporte || '—'} · {telSoporte || '—'}
           </p>
         </div>
@@ -110,7 +114,7 @@ function EntregaPreview({
           <img
             src={logoAbsUrl(logoUrl)}
             alt="Logo"
-            className="h-16 max-w-[140px] object-contain"
+            className="h-12 max-w-[120px] object-contain sm:h-16 sm:max-w-[140px]"
             onError={(e) => {
               e.target.style.display = 'none'
             }}
@@ -140,7 +144,8 @@ function EntregaPreview({
                 <p className="mb-2 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-200">
                   Datos para abono / transferencia
                 </p>
-                <table className="w-full text-left text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[240px] text-left text-sm">
                   <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/50">
                     <tr>
                       <th className="py-1.5 pr-3 font-medium text-gray-600 dark:text-gray-300">Institución</th>
@@ -164,6 +169,7 @@ function EntregaPreview({
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             )
           }
@@ -195,13 +201,14 @@ function EntregaPreview({
       </div>
 
       <p className="mt-6 text-center text-[10px] text-gray-400">
-        Vista previa · LaboraConsult · {new Date().getFullYear()}
+        Vista previa · Consult-360 · {new Date().getFullYear()}
       </p>
     </div>
   )
 }
 
 export default function ConsultoraConfiguracionInicial() {
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [status, setStatus] = useState(null)
   const [instituciones, setInstituciones] = useState([])
@@ -449,9 +456,9 @@ export default function ConsultoraConfiguracionInicial() {
     const res = await consultoraService.finalizarConfiguracion()
     if (res.success) {
       const msg = res.message || 'Consultora activa operativamente.'
-      toast.success(msg, { id: toastId })
+      toast.success(`${msg} Te llevamos al inicio.`, { id: toastId, duration: 4500 })
       setStatus(msg)
-      await loadConfig()
+      navigate('/consultora/dashboard', { replace: true })
     } else {
       const pend = res.errors?.pendientes
       let detail = ''
@@ -469,41 +476,93 @@ export default function ConsultoraConfiguracionInicial() {
     }
   }
 
+  const motionEnter = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
+  const progressPct = Math.min(100, Math.max(0, ((step - 1) / (STEPS.length - 1)) * 100))
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuración inicial</h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Cuatro pasos para dejar tu consultora lista. Los datos alimentan la vista previa del documento
-          de entrega y la validación final.
+    <div className="relative isolate min-w-0 space-y-6 pb-2">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-4 -z-10 mx-auto h-48 max-w-4xl overflow-hidden opacity-90">
+        <div className="absolute -left-20 top-0 h-44 w-44 rounded-full bg-gradient-to-br from-primary-400/20 via-violet-400/15 to-transparent blur-3xl dark:from-primary-600/15 dark:via-violet-600/12" />
+        <div className="absolute -right-16 top-8 h-40 w-40 rounded-full bg-gradient-to-bl from-violet-400/18 to-fuchsia-500/10 blur-3xl dark:from-violet-600/12" />
+      </div>
+
+      <header className={`${motionEnter}`}>
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/70 bg-primary-50/80 px-3 py-1 text-primary-800 shadow-sm dark:border-primary-900/50 dark:bg-primary-950/40 dark:text-primary-200">
+          <Settings2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-[10px] font-bold uppercase tracking-wide sm:text-xs">Asistente de arranque</span>
+          <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        </div>
+        <h1 className="mt-3 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-xl font-bold tracking-tight text-transparent sm:text-2xl dark:from-white dark:via-gray-100 dark:to-gray-300">
+          Configuración inicial
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+          Cuatro pasos para dejar tu consultora lista. Los datos alimentan la vista previa del documento de entrega y
+          la validación final.
+        </p>
+        <p className="mt-2 text-xs font-medium text-gray-500 md:hidden dark:text-gray-400">
+          Paso {step} de {STEPS.length}
+        </p>
+      </header>
+
+      <div className={`hidden md:block ${motionEnter}`} style={{ animationDelay: '60ms' }}>
+        <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-primary-500 to-violet-500 transition-all duration-500 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <p className="mt-1.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
+          Progreso del asistente
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div
+        className={`-mx-1 flex gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 [scrollbar-width:thin] md:mx-0 md:flex-wrap md:overflow-visible ${motionEnter}`}
+        style={{ animationDelay: '100ms' }}
+        role="tablist"
+        aria-label="Pasos de configuración"
+      >
         {STEPS.map((s) => (
           <button
             key={s.id}
             type="button"
+            role="tab"
+            aria-selected={step === s.id}
             onClick={() => setStep(s.id)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            className={clsx(
+              'min-h-[72px] w-[min(88vw,280px)] shrink-0 snap-start rounded-2xl border px-4 py-3 text-left transition-all duration-200 active:scale-[0.99] motion-reduce:active:scale-100 md:min-h-0 md:w-auto md:flex-1 md:min-w-[140px]',
               step === s.id
-                ? 'bg-primary-600 text-white shadow'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
-            }`}
+                ? 'border-primary-500 bg-primary-50 shadow-md shadow-primary-500/10 ring-2 ring-primary-500/20 dark:border-primary-500 dark:bg-primary-950/35 dark:shadow-primary-900/20'
+                : 'border-gray-200/90 bg-white/80 hover:border-gray-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-gray-600'
+            )}
           >
-            {s.id}. {s.title}
+            <span
+              className={clsx(
+                'text-[10px] font-bold uppercase tracking-wide',
+                step === s.id ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+              )}
+            >
+              Paso {s.id}
+            </span>
+            <span className="mt-0.5 block font-semibold text-gray-900 dark:text-white">{s.title}</span>
+            <span className="mt-1 line-clamp-2 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+              {s.desc}
+            </span>
           </button>
         ))}
       </div>
 
       {status && (
-        <div className="whitespace-pre-line rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-100">
+        <div
+          role="status"
+          className={`animate-fade-in whitespace-pre-line rounded-xl border border-primary-200/90 bg-primary-50/95 p-4 text-sm text-primary-900 shadow-sm backdrop-blur-sm motion-reduce:animate-none dark:border-primary-800 dark:bg-primary-900/25 dark:text-primary-100`}
+        >
           {status}
         </div>
       )}
 
       {step === 1 && (
-        <Card title="Paso 1 — Identidad" subtitle={STEPS[0].desc}>
+        <Card title="Paso 1 — Identidad" subtitle={STEPS[0].desc} gradient>
           <form
             onSubmit={f1.handleSubmit(
               (d) => saveStep(1, d),
@@ -517,15 +576,15 @@ export default function ConsultoraConfiguracionInicial() {
             className="grid gap-4 sm:grid-cols-2"
           >
             <div className="sm:col-span-2">
-              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Logo</p>
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:hover:bg-gray-800">
+              <p className="mb-2 text-sm font-semibold text-gray-800 dark:text-gray-200">Logo</p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+                <label className="inline-flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/80 px-4 py-3 text-sm transition-colors hover:border-primary-300 hover:bg-primary-50/30 dark:border-gray-600 dark:bg-gray-800/50 dark:hover:border-primary-700 dark:hover:bg-gray-800 sm:w-auto sm:justify-start">
                   {logoUploading ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary-600 motion-reduce:animate-none" />
                   ) : (
-                    <ImagePlus className="h-5 w-5 text-primary-600" />
+                    <ImagePlus className="h-5 w-5 shrink-0 text-primary-600" />
                   )}
-                  <span>Subir imagen (PNG, JPG, SVG · máx. 2MB)</span>
+                  <span className="text-center sm:text-left">Subir imagen (PNG, JPG, SVG · máx. 2MB)</span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/jpg,image/svg+xml"
@@ -538,13 +597,13 @@ export default function ConsultoraConfiguracionInicial() {
                   <img
                     src={logoAbsUrl(config.logo_url)}
                     alt="Logo actual"
-                    className="h-14 max-w-[120px] rounded object-contain ring-1 ring-gray-200 dark:ring-gray-600"
+                    className="mx-auto h-16 max-w-[140px] rounded-lg object-contain ring-2 ring-gray-200/80 dark:ring-gray-600 sm:mx-0"
                   />
                 )}
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                URL pública:{' '}
-                <code className="rounded bg-black/5 px-1 text-[10px] dark:bg-white/10">
+              <p className="mt-2 break-all text-xs text-gray-500 dark:text-gray-400">
+                URL API:{' '}
+                <code className="rounded-md bg-black/5 px-1.5 py-0.5 text-[10px] dark:bg-white/10">
                   POST {APP_CONFIG.apiUrl}/configuracion/logo
                 </code>
               </p>
@@ -566,7 +625,7 @@ export default function ConsultoraConfiguracionInicial() {
               {...f1.register('telefono_contacto', { required: 'Obligatorio' })}
               error={f1.formState.errors.telefono_contacto?.message}
             />
-            <Button type="submit" className="sm:col-span-2">
+            <Button type="submit" className="w-full min-h-[48px] sm:col-span-2 sm:min-h-0 sm:w-auto">
               Guardar identidad
             </Button>
           </form>
@@ -574,7 +633,7 @@ export default function ConsultoraConfiguracionInicial() {
       )}
 
       {step === 2 && (
-        <Card title="Paso 2 — Datos bancarios" subtitle={STEPS[1].desc}>
+        <Card title="Paso 2 — Datos bancarios" subtitle={STEPS[1].desc} gradient>
           <form
             onSubmit={f2.handleSubmit(
               onPaso2,
@@ -647,7 +706,7 @@ export default function ConsultoraConfiguracionInicial() {
                 ))}
               </select>
             </div>
-            <Button type="submit" className="sm:col-span-2">
+            <Button type="submit" className="w-full min-h-[48px] sm:col-span-2 sm:min-h-0 sm:w-auto">
               Guardar datos bancarios
             </Button>
           </form>
@@ -655,24 +714,31 @@ export default function ConsultoraConfiguracionInicial() {
       )}
 
       {step === 3 && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card title="Campos del documento" subtitle="Activa bloques y marca obligatorios">
-            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card title="Campos del documento" subtitle="Activa bloques y marca obligatorios" gradient>
+            <p className="mb-3 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
               Incluye el recuadro bancario para que el cliente vea cómo pagar. Reordena con las flechas.
             </p>
-            <ul className="mb-4 space-y-2">
+            <ul className="mb-4 max-h-[min(50vh,22rem)] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
               {CAMPOS_PLANTILLA_CATALOGO.map((preset) => {
                 const on = plantillaCampos.some((c) => c.id === preset.id)
                 return (
                   <li key={preset.id}>
-                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-100 p-2 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/40">
+                    <label
+                      className={clsx(
+                        'flex min-h-[48px] cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all duration-200',
+                        on
+                          ? 'border-primary-200 bg-primary-50/50 dark:border-primary-900/50 dark:bg-primary-950/20'
+                          : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50/80 dark:border-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-800/40'
+                      )}
+                    >
                       <input
                         type="checkbox"
-                        className="mt-1 rounded border-gray-300"
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         checked={on}
                         onChange={() => togglePreset(preset)}
                       />
-                      <span className="text-sm">
+                      <span className="min-w-0 text-sm">
                         <span className="font-medium text-gray-900 dark:text-white">{preset.etiqueta}</span>
                         {preset.solo_lectura && (
                           <span className="ml-2 text-xs text-gray-400">(automático)</span>
@@ -683,49 +749,55 @@ export default function ConsultoraConfiguracionInicial() {
                 )
               })}
             </ul>
-            <p className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">Orden en el documento</p>
+            <p className="mb-2 text-sm font-semibold text-gray-800 dark:text-gray-200">Orden en el documento</p>
             <ul className="space-y-2">
               {plantillaCampos.map((c, idx) => (
                 <li
                   key={c.id}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900/40"
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
                 >
-                  <span className="min-w-0 flex-1 truncate font-medium">{c.etiqueta}</span>
+                  <span className="min-w-0 flex-1 basis-[8rem] truncate font-medium text-gray-900 dark:text-white">
+                    {c.etiqueta}
+                  </span>
                   {!c.solo_lectura && (
-                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <input
                         type="checkbox"
+                        className="rounded border-gray-300 text-primary-600"
                         checked={Boolean(c.obligatorio)}
                         onChange={(e) => setObligatorioCampo(c.id, e.target.checked)}
                       />
                       Oblig.
                     </label>
                   )}
-                  <button
-                    type="button"
-                    className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    onClick={() => moveCampo(idx, -1)}
-                    aria-label="Subir"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    onClick={() => moveCampo(idx, 1)}
-                    aria-label="Bajar"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
+                  <div className="ml-auto flex shrink-0 gap-0.5">
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => moveCampo(idx, -1)}
+                      aria-label="Subir"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => moveCampo(idx, 1)}
+                      aria-label="Bajar"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
-            <Button type="button" className="mt-4 w-full" onClick={onPaso3}>
+            <Button type="button" className="mt-4 w-full min-h-[48px] sm:min-h-0" onClick={onPaso3}>
               Guardar plantilla
             </Button>
           </Card>
 
-          <Card title="Vista previa" subtitle="Documento de entrega con datos de tu consultora">
+          <Card title="Vista previa" subtitle="Documento de entrega con datos de tu consultora" gradient>
+            <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
             <EntregaPreview
               nombreMarca={f1v.nombre_comercial || consultora?.nombre_comercial || consultora?.razon_social}
               colorMarca={f1v.color_marca}
@@ -739,70 +811,88 @@ export default function ConsultoraConfiguracionInicial() {
               moneda={f2v.moneda}
               campos={plantillaCampos}
             />
+            </div>
           </Card>
         </div>
       )}
 
       {step === 4 && (
-        <Card title="Paso 4 — Resumen y activación" subtitle={STEPS[3].desc}>
-          <div className="grid gap-6 lg:grid-cols-2">
+        <Card title="Paso 4 — Resumen y activación" subtitle={STEPS[3].desc} gradient>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                <Building2 className="h-4 w-4" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
+                  <Building2 className="h-4 w-4" />
+                </span>
                 Validación previa a operar
               </h3>
               <ul className="space-y-2">
                 {checklist.map((item) => (
                   <li
                     key={item.text}
-                    className="flex items-start gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-gray-800"
+                    className={clsx(
+                      'flex items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-shadow duration-200',
+                      item.ok
+                        ? 'border-emerald-200/80 bg-emerald-50/40 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                        : 'border-amber-200/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/15'
+                    )}
                   >
                     {item.ok ? (
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <X className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                      <X className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
                     )}
-                    <span className={item.ok ? 'text-gray-700 dark:text-gray-300' : 'text-red-700 dark:text-red-300'}>
+                    <span
+                      className={
+                        item.ok
+                          ? 'font-medium text-gray-800 dark:text-gray-200'
+                          : 'font-medium text-amber-900 dark:text-amber-100'
+                      }
+                    >
                       {item.text}
                     </span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 text-sm dark:border-gray-700 dark:bg-gray-800/40">
+            <div className="rounded-2xl border border-gray-200/90 bg-gradient-to-b from-gray-50/90 to-white/50 p-4 text-sm shadow-sm dark:border-gray-700 dark:from-gray-900/60 dark:to-gray-900/40">
               <h4 className="font-semibold text-gray-900 dark:text-white">Datos guardados</h4>
-              <dl className="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
-                <div>
-                  <dt className="text-xs uppercase text-gray-400">Marca</dt>
-                  <dd>{consultora?.nombre_comercial || consultora?.razon_social || '—'}</dd>
+              <dl className="mt-3 space-y-3 text-gray-600 dark:text-gray-300">
+                <div className="border-b border-gray-100 pb-2 dark:border-gray-800">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Marca</dt>
+                  <dd className="mt-0.5 font-medium text-gray-900 dark:text-gray-100">
+                    {consultora?.nombre_comercial || consultora?.razon_social || '—'}
+                  </dd>
                 </div>
-                <div>
-                  <dt className="text-xs uppercase text-gray-400">Soporte</dt>
-                  <dd>
+                <div className="border-b border-gray-100 pb-2 dark:border-gray-800">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Soporte</dt>
+                  <dd className="mt-0.5 break-words font-medium">
                     {config?.correo_soporte || '—'} · {config?.telefono_soporte || '—'}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-xs uppercase text-gray-400">Banco</dt>
-                  <dd>{config?.banco || config?.institucion_financiera?.nombre || '—'}</dd>
+                <div className="border-b border-gray-100 pb-2 dark:border-gray-800">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Banco</dt>
+                  <dd className="mt-0.5 font-medium">{config?.banco || config?.institucion_financiera?.nombre || '—'}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs uppercase text-gray-400">Cuenta / moneda</dt>
-                  <dd>
+                <div className="border-b border-gray-100 pb-2 dark:border-gray-800">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Cuenta / moneda</dt>
+                  <dd className="mt-0.5 font-medium">
                     {config?.nro_cuenta || '—'} · {labelTipoCuenta(config?.tipo_cuenta)} ·{' '}
                     {labelMoneda(config?.moneda)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase text-gray-400">Campos en plantilla</dt>
-                  <dd>{config?.plantilla_entrega?.campos?.length ?? 0}</dd>
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Campos en plantilla</dt>
+                  <dd className="mt-0.5 text-lg font-bold tabular-nums text-primary-600 dark:text-primary-400">
+                    {config?.plantilla_entrega?.campos?.length ?? 0}
+                  </dd>
                 </div>
               </dl>
             </div>
           </div>
           <Button
             type="button"
-            className="mt-6"
+            className="mt-6 w-full min-h-[52px] text-base font-semibold shadow-md shadow-primary-600/15 transition-all hover:shadow-lg disabled:opacity-60 sm:w-auto sm:min-h-0 sm:text-sm"
             disabled={!allChecklistOk}
             onClick={finalizar}
             title={!allChecklistOk ? 'Completa los ítems pendientes' : ''}
@@ -810,8 +900,8 @@ export default function ConsultoraConfiguracionInicial() {
             Activar consultora y comenzar a operar
           </Button>
           {!allChecklistOk && (
-            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              Revisa los pasos anteriores: el botón se habilita cuando todos los requisitos están en verde.
+            <p className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-100">
+              Revisa los pasos anteriores: el botón se habilita cuando todos los requisitos están completos.
             </p>
           )}
         </Card>

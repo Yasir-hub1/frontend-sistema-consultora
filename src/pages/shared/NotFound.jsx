@@ -11,7 +11,7 @@ const NotFound = () => {
             Página no encontrada
           </h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            La ruta solicitada no existe en LaboraConsult.
+            La ruta solicitada no existe en Consult-360.
           </p>
         </div>
 

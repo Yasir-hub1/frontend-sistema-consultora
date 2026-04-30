@@ -55,7 +55,7 @@ export default function AdminDashboard() {
             {stats?.consultoras_pendientes ?? '—'}
           </p>
         </Card>
-        <Card title="Documentación" subtitle="Flujo operativo">
+        {/* <Card title="Documentación" subtitle="Flujo operativo">
           <Link
             to="/flujo-operativo"
             className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:underline"
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
             <ClipboardList className="h-4 w-4" />
             Ver fases 1–10
           </Link>
-        </Card>
+        </Card> */}
       </div>
     </div>
   )

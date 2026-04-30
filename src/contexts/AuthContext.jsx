@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useState } fro
 import { authService } from '../services/authService'
 import { normalizeRole, hasRole, hasAnyRole, ROLES } from '../utils/roleUtils'
 import toast from 'react-hot-toast'
+import { pushService } from '../services/pushService'
 
 export const AuthContext = createContext()
 
@@ -255,6 +256,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      await pushService.cleanupForLogout()
+
       // Intentar hacer logout en el backend solo si hay token
       const token = localStorage.getItem('token')
       if (token) {

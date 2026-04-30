@@ -8,6 +8,7 @@ import {
   Users,
   Briefcase,
   Bell,
+  Files,
 } from 'lucide-react'
 import Card from '../../components/common/Card'
 import { consultoraService } from '../../services/consultoraService'
@@ -40,6 +41,13 @@ const actions = [
     desc: 'Seguimiento y pendientes',
     icon: Bell,
     color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+  },
+  {
+    to: '/consultora/reportes',
+    label: 'Reportes',
+    desc: 'Declaraciones por mes y m?dulo',
+    icon: Files,
+    color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   },
 ]
 
@@ -171,7 +179,7 @@ export default function ConsultoraDashboard() {
               NIT
             </dt>
             <dd className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
-              {cfg?.consultora?.nit ?? 'â€”'}
+              {cfg?.consultora?.nit ?? 'âÿÿ'}
             </dd>
           </div>
         </dl>

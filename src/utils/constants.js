@@ -1,8 +1,8 @@
-// Constantes — LaboraConsult frontend
+// Constantes — Consult-360 frontend
 
 export const APP_CONFIG = {
   apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
-  appName: import.meta.env.VITE_APP_NAME || 'LaboraConsult',
+  appName: import.meta.env.VITE_APP_NAME || 'Consult-360',
   appVersion: import.meta.env.VITE_APP_VERSION || '1.0.0',
   debugMode: import.meta.env.VITE_DEBUG_MODE === 'true' || false,
 }

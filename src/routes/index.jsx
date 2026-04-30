@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/layout/Layout'
 import ProtectedRoute from '../components/auth/ProtectedRoute'
 import { normalizeRole, ROLES } from '../utils/roleUtils'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 import Home from '../pages/public/Home'
 import FlujoOperativoLaboraConsult from '../pages/public/laboraconsult/FlujoOperativoLaboraConsult'
@@ -22,6 +23,7 @@ import ConsultoraMisEmpresas from '../pages/consultora/MisEmpresas'
 import ConsultoraEmpresaDetalle from '../pages/consultora/EmpresaClienteDetalle'
 import ConsultoraAlertas from '../pages/consultora/Alertas'
 import ConsultoraCatalogoDocumentos from '../pages/consultora/CatalogoDocumentos'
+import ConsultoraReportes from '../pages/consultora/Reportes'
 
 import ColaboradorDashboard from '../pages/colaborador/Dashboard'
 import ColaboradorEmpresas from '../pages/colaborador/EmpresasAsignadas'
@@ -32,6 +34,7 @@ import EmpresaClienteDashboard from '../pages/empresa-cliente/Dashboard'
 import EmpresaClientePersonal from '../pages/empresa-cliente/Personal'
 import EmpresaClienteEmpleado from '../pages/empresa-cliente/EmpleadoVista'
 import EmpresaClienteMiConsultora from '../pages/empresa-cliente/MiConsultora'
+import EmpresaClienteDeclaraciones from '../pages/empresa-cliente/DeclaracionesMensuales'
 
 function postLoginHome(user) {
   const r = normalizeRole(user?.rol)
@@ -44,6 +47,7 @@ function postLoginHome(user) {
 
 const AppRoutes = () => {
   const { isAuthenticated, user } = useAuth()
+  usePushNotifications(isAuthenticated)
 
   return (
     <Routes>
@@ -103,6 +107,7 @@ const AppRoutes = () => {
         <Route path="mis-empresas/:empresaId" element={<ConsultoraEmpresaDetalle />} />
         <Route path="alertas" element={<ConsultoraAlertas />} />
         <Route path="catalogo-documentos" element={<ConsultoraCatalogoDocumentos />} />
+        <Route path="reportes" element={<ConsultoraReportes />} />
         <Route path="perfil" element={<Perfil />} />
       </Route>
 
@@ -135,6 +140,7 @@ const AppRoutes = () => {
       >
         <Route index element={<Navigate to="/empresa-cliente/dashboard" replace />} />
         <Route path="dashboard" element={<EmpresaClienteDashboard />} />
+        <Route path="declaraciones-mensuales" element={<EmpresaClienteDeclaraciones />} />
         <Route path="personal" element={<EmpresaClientePersonal />} />
         <Route path="personal/:personalId" element={<EmpresaClienteEmpleado />} />
         <Route path="mi-consultora" element={<EmpresaClienteMiConsultora />} />

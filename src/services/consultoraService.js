@@ -2,7 +2,7 @@
  * API titular consultora — configuración, equipo, empresas cliente, alertas (Fases 2–4, 9).
  */
 
-import { del, get, post, put, patch, upload } from './api'
+import api, { del, get, post, put, patch, upload } from './api'
 import { MESSAGES, PAGINATION_CONFIG } from '../utils/constants'
 
 function stripEmpty(params) {
@@ -300,6 +300,7 @@ export const consultoraService = {
         nivel: params.nivel || '',
         modulo: params.modulo || '',
         resuelta: params.resuelta,
+        leida: params.leida,
       })
       const response = await get('/consultora/alertas', queryParams)
       if (response.data.success) {
@@ -308,6 +309,84 @@ export const consultoraService = {
       return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
     } catch (error) {
       return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async listReportesDeclaraciones(params = {}) {
+    try {
+      const queryParams = stripEmpty({
+        mes_gestion: params.mes_gestion || '',
+        modulo: params.modulo || '',
+        page: params.page || 1,
+        per_page: params.per_page || 50,
+      })
+      const response = await get('/consultora/reportes/declaraciones', queryParams)
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async fetchReporteDeclaracionPreviewBlob(id) {
+    try {
+      const response = await api.get(`/consultora/reportes/declaraciones/${id}/vista-previa`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return { success: true, blob }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async descargarReporteDeclaracion(id, nombreOriginal) {
+    return download(`/consultora/reportes/declaraciones/${id}/descargar`, {}, nombreOriginal || `declaracion-${id}.pdf`)
+  },
+
+  async exportarReporteDeclaracionesPdf(payload) {
+    try {
+      const response = await api.post('/consultora/reportes/declaraciones/exportar-pdf', payload, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        const j = JSON.parse(text)
+        return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+      }
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `reporte_${payload.mes_gestion}_${(payload.modulo || 'todos').toUpperCase()}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      return { success: true }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          // fallthrough
+        }
+      }
+      return { success: false, message: error.response?.data?.message || error.message || MESSAGES.ERROR_FETCH }
     }
   },
 }

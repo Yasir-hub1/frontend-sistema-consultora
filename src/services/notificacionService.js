@@ -1,4 +1,13 @@
-import { get, put, del } from './api'
+import { get, put, del, patch } from './api'
+import { ROLES, normalizeRole } from '../utils/roleUtils'
+
+function baseUrlAlertasPorRol(roleOrTipo) {
+  const r = normalizeRole(roleOrTipo)
+  if (r === ROLES.CONSULTORA) return '/consultora/alertas'
+  if (r === ROLES.COLABORADOR) return '/colaborador/alertas'
+  if (r === ROLES.EMPRESA_CLIENTE) return '/empresa-cliente/alertas'
+  return null
+}
 
 export const notificacionService = {
   /**
@@ -154,6 +163,67 @@ export const notificacionService = {
         message: error.message || 'Error al eliminar notificación'
       }
     }
-  }
+  },
+
+  /**
+   * Marcar alerta del panel (Consult-360) como leída según el rol del usuario.
+   * @param {number} id - ID de la alerta
+   * @param {string} roleOrTipo - Rol normalizado o tipo backend
+   */
+  async marcarAlertaLeida(id, roleOrTipo) {
+    const base = baseUrlAlertasPorRol(roleOrTipo)
+    if (!base) {
+      return { success: false, message: 'Rol no soportado para alertas.' }
+    }
+    try {
+      const response = await patch(`${base}/${id}/marcar-leida`, {})
+      if (response.data?.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message || 'Marcada como leída.',
+        }
+      }
+      return {
+        success: false,
+        message: response.data?.message || 'No se pudo marcar como leída.',
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Error al marcar como leída.',
+      }
+    }
+  },
+
+  /**
+   * Marcar todas las alertas visibles para el rol como leídas.
+   * @param {string} roleOrTipo
+   */
+  async marcarTodasAlertasLeidas(roleOrTipo) {
+    const base = baseUrlAlertasPorRol(roleOrTipo)
+    if (!base) {
+      return { success: false, message: 'Rol no soportado para alertas.' }
+    }
+    try {
+      const response = await patch(`${base}/marcar-todas-leidas`, {})
+      if (response.data?.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message || 'Marcadas como leídas.',
+        }
+      }
+      return {
+        success: false,
+        message: response.data?.message || 'No se pudo completar.',
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Error al marcar como leídas.',
+      }
+    }
+  },
 }
 

@@ -1,5 +1,5 @@
 /**
- * Roles LaboraConsult — alineados a `usuarios.tipo` del backend.
+ * Roles Consult-360 — alineados a `usuarios.tipo` del backend.
  * Valores canónicos en mayúsculas para el frontend.
  */
 

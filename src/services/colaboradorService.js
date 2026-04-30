@@ -2,7 +2,7 @@
  * API colaborador — empresas asignadas, personal, documentos AFP/CAJA/Ministerio (Fases 5–8).
  */
 
-import { get, patch, post, upload } from './api'
+import api, { download, get, patch, post, upload } from './api'
 import { MESSAGES, PAGINATION_CONFIG } from '../utils/constants'
 
 function stripEmpty(params) {
@@ -32,6 +32,7 @@ export const colaboradorService = {
         page: params.page || 1,
         per_page: params.per_page || PAGINATION_CONFIG.DEFAULT_PAGE_SIZE,
         resuelta: params.resuelta,
+        leida: params.leida,
       })
       const response = await get('/colaborador/alertas', queryParams)
       if (response.data.success) {
@@ -130,7 +131,10 @@ export const colaboradorService = {
 
   async createPersonal(empresaClienteId, payload) {
     try {
-      const response = await post(`/colaborador/empresas-cliente/${empresaClienteId}/personal`, payload)
+      const isFormData = payload instanceof FormData
+      const response = isFormData
+        ? await upload(`/colaborador/empresas-cliente/${empresaClienteId}/personal`, payload)
+        : await post(`/colaborador/empresas-cliente/${empresaClienteId}/personal`, payload)
       if (response.data.success) {
         return { success: true, data: response.data.data, message: response.data.message }
       }
@@ -142,10 +146,17 @@ export const colaboradorService = {
 
   async updatePersonal(empresaClienteId, personalId, payload) {
     try {
-      const response = await patch(
-        `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
-        payload
-      )
+      const isFormData = payload instanceof FormData
+      const response = isFormData
+        ? await patch(
+            `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
+            payload,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          )
+        : await patch(
+            `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
+            payload
+          )
       if (response.data.success) {
         return { success: true, data: response.data.data, message: response.data.message }
       }
@@ -194,5 +205,88 @@ export const colaboradorService = {
     } catch (error) {
       return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
     }
+  },
+
+  async listDeclaracionesMensuales(empresaClienteId) {
+    try {
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales`)
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async subirDeclaracionMensual(empresaClienteId, formData) {
+    try {
+      const response = await upload(
+        `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales`,
+        formData
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
+  async fetchDeclaracionVistaPreviaBlob(empresaClienteId, id) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales/${id}/vista-previa`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return {
+        success: true,
+        blob,
+        contentType: response.headers['content-type'] || blob.type || '',
+      }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* fall through */
+        }
+      }
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async descargarDeclaracionMensual(empresaClienteId, id, nombreOriginal) {
+    await download(
+      `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales/${id}/descargar`,
+      {},
+      nombreOriginal || 'declaracion'
+    )
   },
 }

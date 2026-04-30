@@ -287,6 +287,55 @@ export const download = (url, params = {}, filename = 'download') => {
 }
 
 /**
+ * POST con respuesta binaria (ej. ZIP) y descarga en el navegador.
+ * @param {string} url
+ * @param {object} data - JSON body
+ * @param {string} fallbackFilename
+ */
+export const downloadPost = async (url, data = {}, fallbackFilename = 'download.zip') => {
+  try {
+    const response = await api.post(url, data, { responseType: 'blob' })
+    const blob = response.data
+    if (blob instanceof Blob && blob.type?.includes('application/json')) {
+      const j = JSON.parse(await blob.text())
+      throw new Error(j.message || 'Error al descargar')
+    }
+    const cd = response.headers['content-disposition']
+    let name = fallbackFilename
+    if (cd) {
+      const m = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+      if (m) {
+        try {
+          name = decodeURIComponent(m[1].replace(/"/g, '').trim())
+        } catch {
+          name = m[1].replace(/"/g, '').trim() || name
+        }
+      }
+    }
+    const downloadUrl = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]))
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    const d = error.response?.data
+    if (d instanceof Blob) {
+      try {
+        const j = JSON.parse(await d.text())
+        throw new Error(j.message || 'Error al descargar')
+      } catch (inner) {
+        if (inner instanceof Error && inner.message && !inner.message.includes('JSON')) throw inner
+      }
+      throw new Error('Error al descargar')
+    }
+    throw error instanceof Error ? error : new Error('Error al descargar')
+  }
+}
+
+/**
  * Realiza múltiples peticiones en paralelo
  * @param {Array} requests - Array de peticiones
  * @returns {Promise} Respuestas de las peticiones
