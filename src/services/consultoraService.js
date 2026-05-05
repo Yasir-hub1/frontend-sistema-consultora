@@ -364,6 +364,58 @@ export const consultoraService = {
     return download(`/consultora/reportes/declaraciones/${id}/descargar`, {}, nombreOriginal || `declaracion-${id}.pdf`)
   },
 
+  async getResumenAportesMensual(params) {
+    try {
+      const queryParams = stripEmpty({
+        empresa_cliente_id: params.empresa_cliente_id,
+        mes_gestion: params.mes_gestion,
+      })
+      const response = await get('/consultora/reportes/resumen-aportes', queryParams)
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async fetchResumenAportesPdfBlob(params) {
+    try {
+      const queryParams = stripEmpty({
+        empresa_cliente_id: params.empresa_cliente_id,
+        mes_gestion: params.mes_gestion,
+      })
+      const response = await api.get('/consultora/reportes/resumen-aportes/pdf', {
+        params: queryParams,
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return { success: true, blob }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
   async exportarReporteDeclaracionesPdf(payload) {
     try {
       const response = await api.post('/consultora/reportes/declaraciones/exportar-pdf', payload, {
