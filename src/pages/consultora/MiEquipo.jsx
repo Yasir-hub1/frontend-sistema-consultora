@@ -62,27 +62,48 @@ const MODULOS_PERMISO = [
   { key: 'ministerio', label: 'Ministerio' },
 ]
 
+const CAMPOS_PERMISO_MODULO = [
+  'puede_registrar_personal',
+  'puede_editar_personal',
+  'puede_subir_documentos',
+  'puede_gestionar_modulo',
+]
+
+/** Normaliza valores que a veces vienen como 0/1 o string desde APIs. */
+function normalizePermisoBool(v) {
+  if (v === true || v === 1 || v === '1') return true
+  if (v === false || v === 0 || v === '0' || v === '' || v == null) return false
+  if (typeof v === 'string') return v.toLowerCase() === 'true'
+  return Boolean(v)
+}
+
 function buildPermDraft(row) {
   const permisos = MODULOS_PERMISO.map(({ key: modulo }) => {
     const cur = Array.isArray(row.permisos_por_modulo)
-      ? row.permisos_por_modulo.find((p) => p.modulo === modulo)
+      ? row.permisos_por_modulo.find((p) => String(p.modulo) === modulo)
       : null
     return {
       modulo,
-      puede_ver: cur ? Boolean(cur.puede_ver) : true,
-      puede_registrar_personal: Boolean(cur?.puede_registrar_personal),
-      puede_editar_personal: Boolean(cur?.puede_editar_personal),
-      puede_subir_documentos: Boolean(cur?.puede_subir_documentos),
-      puede_eliminar_documentos: Boolean(cur?.puede_eliminar_documentos),
-      puede_gestionar_modulo: Boolean(cur?.puede_gestionar_modulo),
-      puede_exportar_reportes: Boolean(cur?.puede_exportar_reportes),
-      puede_invitar_empresa: Boolean(cur?.puede_invitar_empresa),
+      puede_registrar_personal: normalizePermisoBool(cur?.puede_registrar_personal),
+      puede_editar_personal: normalizePermisoBool(cur?.puede_editar_personal),
+      puede_subir_documentos: normalizePermisoBool(cur?.puede_subir_documentos),
+      puede_gestionar_modulo: normalizePermisoBool(cur?.puede_gestionar_modulo),
     }
   })
   return {
-    puede_editar_empresa_cliente: Boolean(row.puede_editar_empresa_cliente),
+    puede_editar_empresa_cliente: normalizePermisoBool(row.puede_editar_empresa_cliente),
     permisos,
   }
+}
+
+function serializePermisosParaApi(permisos) {
+  return permisos.map((p) => {
+    const o = { modulo: String(p.modulo) }
+    for (const campo of CAMPOS_PERMISO_MODULO) {
+      o[campo] = normalizePermisoBool(p[campo])
+    }
+    return o
+  })
 }
 
 function estadoBadge(estado, habilitado) {
@@ -245,13 +266,28 @@ export default function ConsultoraMiEquipo() {
     }))
   }
 
+  const patchPermisoGlobal = (campo, valor) => {
+    setPermDraft((d) => ({
+      ...d,
+      permisos: d.permisos.map((p) => ({ ...p, [campo]: Boolean(valor) })),
+    }))
+  }
+
+  const patchDeclaracionAguinaldoGlobal = (valor) => {
+    // Aguinaldo (empresa) se habilita cuando puede declarar al menos un módulo.
+    setPermDraft((d) => ({
+      ...d,
+      permisos: d.permisos.map((p) => ({ ...p, puede_gestionar_modulo: Boolean(valor) })),
+    }))
+  }
+
   const guardarPermisos = async () => {
     if (!permRow) return
     setPermSaving(true)
     setMsg(null)
     const res = await consultoraService.updateColaboradorPermisos(permRow.id, {
-      puede_editar_empresa_cliente: permDraft.puede_editar_empresa_cliente,
-      permisos: permDraft.permisos,
+      puede_editar_empresa_cliente: normalizePermisoBool(permDraft.puede_editar_empresa_cliente),
+      permisos: serializePermisosParaApi(permDraft.permisos),
     })
     setPermSaving(false)
     if (res.success) {
@@ -673,10 +709,70 @@ export default function ConsultoraMiEquipo() {
       >
         {permRow ? (
           <div className="space-y-5">
+            {/*
+              Registrar/Editar son permisos globales en backend (OR por módulos).
+              Se muestran una sola vez para evitar duplicidad visual.
+            */}
+            {(() => {
+              const registrarGlobal = permDraft.permisos.some((p) => Boolean(p.puede_registrar_personal))
+              const editarGlobal = permDraft.permisos.some((p) => Boolean(p.puede_editar_personal))
+              const aguinaldoGlobal = permDraft.permisos.some((p) => Boolean(p.puede_gestionar_modulo))
+              return (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Permisos globales del colaborador</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {[
+                      {
+                        campo: 'puede_registrar_personal',
+                        checked: registrarGlobal,
+                        label: 'Registrar nuevo personal',
+                        hint: 'Habilita el botón de alta de personal para todo el portal colaborador.',
+                      },
+                      {
+                        campo: 'puede_editar_personal',
+                        checked: editarGlobal,
+                        label: 'Editar legajo (datos del empleado)',
+                        hint: 'Permite editar ficha del trabajador y régimen CAJA en todo el portal colaborador.',
+                      },
+                      {
+                        campo: 'puede_gestionar_modulo_global',
+                        checked: aguinaldoGlobal,
+                        label: 'Cargar declaración de aguinaldo (empresa)',
+                        hint: 'Habilita la carga anual de aguinaldo en Personal. Se aplica sobre módulos para mantener coherencia.',
+                      },
+                    ].map(({ campo, checked, label, hint }) => (
+                      <label
+                        key={campo}
+                        className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent p-1 text-xs text-gray-700 hover:border-gray-200 dark:text-gray-300 dark:hover:border-gray-600"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (campo === 'puede_gestionar_modulo_global') {
+                              patchDeclaracionAguinaldoGlobal(e.target.checked)
+                            } else {
+                              patchPermisoGlobal(campo, e.target.checked)
+                            }
+                          }}
+                        />
+                        <span>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">{label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                            {hint}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Los permisos por módulo (AFP, CAJA, Ministerio) se aplican al flujo de documentos y legajo. La
-              opción de empresa permite corregir nombre comercial, NIT, representante y contacto en las
-              empresas asignadas.
+              Cada fila corresponde a <strong className="font-semibold text-gray-800 dark:text-gray-200">AFP, CAJA o Ministerio</strong> y controla
+              acciones operativas del módulo. Los permisos globales se configuran una sola vez arriba.
             </p>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/40">
@@ -705,28 +801,35 @@ export default function ConsultoraMiEquipo() {
                     className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40"
                   >
                     <p className="text-sm font-bold text-gray-900 dark:text-white">{label}</p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       {[
-                        ['puede_ver', 'Ver módulo'],
-                        ['puede_registrar_personal', 'Registrar personal'],
-                        ['puede_editar_personal', 'Editar legajo / personal'],
-                        ['puede_subir_documentos', 'Subir documentos'],
-                        ['puede_eliminar_documentos', 'Eliminar documentos'],
-                        ['puede_gestionar_modulo', 'Gestionar trámites del módulo'],
-                        ['puede_exportar_reportes', 'Exportar reportes'],
-                        ['puede_invitar_empresa', 'Invitar / credenciales empresa'],
-                      ].map(([campo, texto]) => (
+                        {
+                          campo: 'puede_subir_documentos',
+                          label: 'Subir documentos del módulo',
+                          hint: 'Habilita solo la carga de archivos del catálogo de este módulo en Gestión de empleado.',
+                        },
+                        {
+                          campo: 'puede_gestionar_modulo',
+                          label: 'Cargar declaración mensual del módulo',
+                          hint: 'Habilita la declaración mensual de este módulo en Personal > Declaración mensual.',
+                        },
+                      ].map(({ campo, label, hint }) => (
                         <label
                           key={campo}
-                          className="flex cursor-pointer items-center gap-2 text-xs text-gray-700 dark:text-gray-300"
+                          className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent p-1 text-xs text-gray-700 hover:border-gray-200 dark:text-gray-300 dark:hover:border-gray-600"
                         >
                           <input
                             type="checkbox"
-                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             checked={Boolean(p[campo])}
                             onChange={(e) => patchPermisoCampo(idx, campo, e.target.checked)}
                           />
-                          {texto}
+                          <span>
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">{label}</span>
+                            <span className="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                              {hint}
+                            </span>
+                          </span>
                         </label>
                       ))}
                     </div>

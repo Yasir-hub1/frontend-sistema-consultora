@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Download,
+  Eye,
   FileSpreadsheet,
   Package,
   Trash2,
@@ -12,6 +13,7 @@ import {
 import { clsx } from 'clsx'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
+import Modal from '../../components/common/Modal'
 import EmpresaClienteShell, { staggerDelayMs } from '../../components/empresa-cliente/EmpresaClienteShell'
 import { empresaClienteService } from '../../services/empresaClienteService'
 
@@ -30,6 +32,17 @@ export default function EmpresaClienteDeclaracionesMensuales() {
   const [selected, setSelected] = useState(() => new Set())
   const [downloadingId, setDownloadingId] = useState(null)
   const [zipLoading, setZipLoading] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState(null)
+
+  function previewKind(nombreOriginal, contentType) {
+    const c = String(contentType || '').toLowerCase()
+    const n = String(nombreOriginal || '').toLowerCase()
+    if (c.includes('pdf') || n.endsWith('.pdf')) return 'pdf'
+    if (c.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/.test(n)) return 'image'
+    return 'none'
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -126,6 +139,39 @@ export default function EmpresaClienteDeclaracionesMensuales() {
     setZipLoading(false)
   }
 
+  const onVerFila = async (row) => {
+    setPreview((prev) => {
+      if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl)
+      return prev
+    })
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreview({ id: row.id, nombre: row.nombre_original, objectUrl: null, kind: null })
+    const res = await empresaClienteService.fetchDeclaracionMensualVistaPreviaBlob(row.id)
+    if (!res.success) {
+      setPreviewError(res.message || 'No se pudo cargar la vista previa.')
+      setPreviewLoading(false)
+      return
+    }
+    const objectUrl = URL.createObjectURL(res.blob)
+    setPreview({
+      id: row.id,
+      nombre: res.nombreOriginal || row.nombre_original,
+      objectUrl,
+      kind: previewKind(res.nombreOriginal || row.nombre_original, res.contentType),
+    })
+    setPreviewLoading(false)
+  }
+
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl)
+      return null
+    })
+    setPreviewError(null)
+    setPreviewLoading(false)
+  }
+
   const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
   const selectionOpen = items.length > 0 && selected.size > 0
 
@@ -158,8 +204,8 @@ export default function EmpresaClienteDeclaracionesMensuales() {
               Declaración mensual de personal
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-              Descarga el archivo que tu consultora cargó por mes. Puedes bajar un mes concreto o varios meses en un
-              solo ZIP.
+              Descarga el PDF que tu consultora cargó por mes. Puedes bajar un mes concreto o varios meses en un solo
+              ZIP.
             </p>
           </div>
         </div>
@@ -277,6 +323,14 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatBytes(row.tamano_bytes)}</p>
                         <button
                           type="button"
+                          onClick={() => void onVerFila(row)}
+                          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-gray-700 transition-all active:scale-[0.99] dark:border-gray-600 dark:text-gray-200"
+                        >
+                          <Eye className="h-4 w-4 shrink-0" />
+                          Ver
+                        </button>
+                        <button
+                          type="button"
                           disabled={downloadingId === row.id}
                           onClick={() => void onDescargarFila(row)}
                           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-primary-700 transition-all active:scale-[0.99] disabled:opacity-50 dark:border-gray-600 dark:text-primary-300"
@@ -337,15 +391,25 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                           {formatBytes(row.tamano_bytes)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-right">
-                          <button
-                            type="button"
-                            disabled={downloadingId === row.id}
-                            onClick={() => void onDescargarFila(row)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-primary-700 transition-all duration-200 hover:border-primary-300 hover:bg-primary-50 hover:shadow-sm disabled:opacity-50 dark:border-gray-600 dark:text-primary-300 dark:hover:bg-gray-800"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {downloadingId === row.id ? '…' : 'Descargar'}
-                          </button>
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void onVerFila(row)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              disabled={downloadingId === row.id}
+                              onClick={() => void onDescargarFila(row)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-primary-700 transition-all duration-200 hover:border-primary-300 hover:bg-primary-50 hover:shadow-sm disabled:opacity-50 dark:border-gray-600 dark:text-primary-300 dark:hover:bg-gray-800"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {downloadingId === row.id ? '…' : 'Descargar'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -407,6 +471,40 @@ export default function EmpresaClienteDeclaracionesMensuales() {
           </div>
         </div>
       ) : null}
+      <Modal
+        isOpen={Boolean(preview)}
+        onClose={closePreview}
+        title={preview?.nombre ? `Vista previa · ${preview.nombre}` : 'Vista previa'}
+        size="xl"
+        bodyClassName="p-0 max-h-[85vh] overflow-hidden"
+      >
+        <div className="min-h-[360px] bg-gray-50 dark:bg-gray-900">
+          {previewLoading ? (
+            <div className="flex h-[420px] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+              Cargando vista previa…
+            </div>
+          ) : previewError ? (
+            <div className="flex h-[420px] items-center justify-center px-6 text-center text-sm text-gray-600 dark:text-gray-300">
+              {previewError}
+            </div>
+          ) : preview?.kind === 'pdf' && preview.objectUrl ? (
+            <iframe title={preview.nombre || 'Vista previa'} src={preview.objectUrl} className="h-[75vh] w-full border-0" />
+          ) : preview?.kind === 'image' && preview.objectUrl ? (
+            <div className="flex h-[75vh] items-center justify-center p-4">
+              <img src={preview.objectUrl} alt={preview.nombre || 'Vista previa'} className="max-h-full max-w-full object-contain" />
+            </div>
+          ) : (
+            <div className="flex h-[420px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-gray-600 dark:text-gray-300">
+              <p>No hay vista previa para este formato.</p>
+              {preview?.id ? (
+                <Button type="button" size="sm" icon={<Download className="h-4 w-4" />} onClick={() => void onDescargarFila({ id: preview.id, nombre_original: preview.nombre })}>
+                  Descargar archivo
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </Modal>
       </div>
     </EmpresaClienteShell>
   )

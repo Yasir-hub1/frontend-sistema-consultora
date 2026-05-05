@@ -2,7 +2,7 @@
  * API empresa cliente — portal solo lectura (Fase 10).
  */
 
-import { download, downloadPost, get } from './api'
+import api, { download, downloadPost, get } from './api'
 import { MESSAGES, PAGINATION_CONFIG } from '../utils/constants'
 
 function stripEmpty(params) {
@@ -197,6 +197,40 @@ export const empresaClienteService = {
       {},
       nombreOriginal || `declaracion-${id}`
     )
+  },
+
+  async fetchDeclaracionMensualVistaPreviaBlob(id) {
+    try {
+      const response = await api.get(
+        `/empresa-cliente/declaraciones-mensuales/${id}/vista-previa`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      const cd = response.headers['content-disposition'] || ''
+      const m = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(cd)
+      const nombre = m ? decodeURIComponent(m[1]) : `declaracion-${id}`
+      const contentType =
+        (blob instanceof Blob && blob.type && blob.type !== 'application/octet-stream'
+          ? blob.type
+          : null) ||
+        response.headers['content-type'] ||
+        'application/octet-stream'
+      return { success: true, blob, nombreOriginal: nombre, contentType }
+    } catch (error) {
+      const d = error.response?.data
+      if (d instanceof Blob) {
+        try {
+          const j = JSON.parse(await d.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* noop */
+        }
+      }
+      return {
+        success: false,
+        message: error.message || error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
   },
 
   async descargarDeclaracionesMensualesZip(meses, fallbackName = 'declaraciones.zip') {

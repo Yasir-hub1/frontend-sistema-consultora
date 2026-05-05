@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useState } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react'
 import { authService } from '../services/authService'
 import { normalizeRole, hasRole, hasAnyRole, ROLES } from '../utils/roleUtils'
 import toast from 'react-hot-toast'
@@ -96,6 +96,34 @@ export function AuthProvider({ children }) {
     
     verifyAuth()
   }, []) // Solo ejecutar una vez al montar
+
+  /**
+   * Vuelve a cargar el usuario desde /auth/perfil (mismo token).
+   * Útil cuando la consultora actualiza permisos del colaborador y el SPA debe reflejarlos.
+   */
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      return { success: false }
+    }
+    try {
+      const response = await authService.getCurrentUser()
+      if (response.success && response.data) {
+        const userData = { ...response.data }
+        if (userData.rol) {
+          userData.rol = normalizeRole(userData.rol)
+        }
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user: userData, token },
+        })
+        return { success: true }
+      }
+    } catch (e) {
+      console.error('refreshUser:', e)
+    }
+    return { success: false }
+  }, [])
 
   const checkAuth = async () => {
     try {
@@ -536,6 +564,7 @@ export function AuthProvider({ children }) {
     clearError,
     setAuthData,
     checkAuth,
+    refreshUser,
     // Métodos de verificación de roles (renombrados para evitar conflictos)
     hasRole: checkRole,
     hasAnyRole: checkAnyRole,

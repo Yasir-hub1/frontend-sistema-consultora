@@ -8,6 +8,7 @@ import { colaboradorService } from '../../services/colaboradorService'
 import { notificacionService } from '../../services/notificacionService'
 import { useAuth } from '../../contexts/AuthContext'
 import { resolveAlertaPath } from '../../utils/alertaNavigation'
+import { sanitizeUiMessage } from '../../utils/uiMessage'
 
 export default function ColaboradorDashboard() {
   const [data, setData] = useState(null)
@@ -121,7 +122,7 @@ export default function ColaboradorDashboard() {
             role="status"
             className="animate-fade-in rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 shadow-sm motion-reduce:animate-none dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100"
           >
-            {msg}
+            {sanitizeUiMessage(msg)}
           </div>
         )}
 

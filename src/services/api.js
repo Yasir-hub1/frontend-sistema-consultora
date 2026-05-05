@@ -22,6 +22,20 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // FormData: no fijar Content-Type (el cliente añade multipart + boundary).
+    // Si queda application/json (default) o multipart sin boundary, Laravel no recibe campos.
+    if (config.data instanceof FormData) {
+      const h = config.headers
+      // Axios 1.x: setContentType(false) fuerza boundary correcto; delete a veces no anula el default JSON.
+      if (h && typeof h.setContentType === 'function') {
+        h.setContentType(false)
+      } else if (h && typeof h.delete === 'function') {
+        h.delete('Content-Type')
+      } else if (h) {
+        delete h['Content-Type']
+      }
+    }
     
     // Log de peticiones en modo debug
     if (APP_CONFIG.debugMode) {
@@ -254,12 +268,7 @@ export const del = (url, config = {}) => {
  * @returns {Promise} Respuesta de la petición
  */
 export const upload = (url, formData, config = {}) => {
-  return api.post(url, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    ...config
-  })
+  return api.post(url, formData, config)
 }
 
 /**

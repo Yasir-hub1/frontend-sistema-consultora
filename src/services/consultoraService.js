@@ -142,7 +142,16 @@ export const consultoraService = {
       }
       return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
+      const d = error.response?.data
+      const msg =
+        d?.message ||
+        (d?.errors && typeof d.errors === 'object'
+          ? Object.entries(d.errors)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
+              .join(' · ')
+          : null) ||
+        MESSAGES.ERROR.UPDATE
+      return { success: false, message: msg, errors: d?.errors }
     }
   },
 

@@ -22,7 +22,24 @@ import Modal from '../../components/common/Modal'
 import Button from '../../components/common/Button'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 import Input from '../../components/common/Input'
-import { ROLES } from '../../utils/roleUtils'
+import {
+  colaboradorPuedeEditarEmpresaCliente,
+  colaboradorPuedeEditarLegajoGlobal,
+  colaboradorPuedeSubirDocumentosEnModulo,
+} from '../../utils/colaboradorPermisos'
+import { sanitizeUiMessage } from '../../utils/uiMessage'
+import { getApiOrigin } from '../../utils/constants'
+
+/** URL absoluta para iframes / enlaces a PDFs en `/storage/...`. */
+function absoluteBackendUrl(pathOrUrl) {
+  if (!pathOrUrl) return null
+  const s = String(pathOrUrl).trim()
+  if (!s) return null
+  if (/^https?:\/\//i.test(s)) return s
+  const origin = getApiOrigin()
+  const path = s.startsWith('/') ? s : `/${s}`
+  return origin ? `${origin}${path}` : path
+}
 
 const MODULOS = [
   {
@@ -120,13 +137,144 @@ function documentoVigente(list) {
   return arr.find((d) => d.es_vigente) ?? null
 }
 
+function isPdfFile(file) {
+  if (!file || !(file instanceof File)) return false
+  if (file.type === 'application/pdf') return true
+  if (file.type && file.type !== 'application/pdf') return false
+  return String(file.name || '').toLowerCase().endsWith('.pdf')
+}
+
+function isImageOrPdfFile(file) {
+  if (!file || !(file instanceof File)) return false
+  if (file.type === 'application/pdf') return true
+  if (file.type.startsWith('image/')) return true
+  const n = String(file.name || '').toLowerCase()
+  return /\.(pdf|png|jpe?g|webp)$/i.test(n)
+}
+
+function previewKindFromUrl(url) {
+  const s = String(url || '').toLowerCase()
+  if (s.endsWith('.pdf') || s.includes('.pdf?')) return 'pdf'
+  if (/\.(png|jpe?g|webp)(\?|$)/i.test(s)) return 'image'
+  return 'pdf'
+}
+
+const PERSONA_FORM_EMPTY = {
+  nombres: '',
+  apellidos: '',
+  ci: '',
+  correo_electronico: '',
+  fecha_ingreso: '',
+  cuenta_bancaria: '',
+}
+
+function personaDefaultsFromEmpleado(e) {
+  if (!e) return { ...PERSONA_FORM_EMPTY }
+  return {
+    ...PERSONA_FORM_EMPTY,
+    nombres: e.nombres ?? '',
+    apellidos: e.apellidos ?? '',
+    ci: e.ci ?? '',
+    correo_electronico: e.correo_electronico ?? '',
+    fecha_ingreso: isoToDateInput(e.fecha_ingreso),
+    cuenta_bancaria: e.cuenta_bancaria ?? '',
+  }
+}
+
+function LegajoPdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, disabled }) {
+  const resolvedCurrent = absoluteBackendUrl(currentUrl)
+  const iframeSrc = previewUrl || (!file && resolvedCurrent ? resolvedCurrent : null)
+
+  return (
+    <div className="rounded-xl border border-gray-200/80 p-3 dark:border-gray-700">
+      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{title}</label>
+      <input
+        type="file"
+        accept=".pdf,application/pdf"
+        className="input w-full py-2.5"
+        onChange={onChange}
+        disabled={disabled}
+      />
+      {resolvedCurrent && !file ? (
+        <a
+          href={resolvedCurrent}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+        >
+          Abrir PDF en nueva pestaña
+        </a>
+      ) : null}
+      {file ? (
+        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+          {file.name} · {formatBytes(file.size)}
+        </p>
+      ) : null}
+      {iframeSrc ? (
+        <iframe
+          title={title}
+          src={iframeSrc}
+          className="mt-3 h-44 w-full rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/50"
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function LegajoImagePdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, disabled }) {
+  const resolvedCurrent = absoluteBackendUrl(currentUrl)
+  const previewKind = file ? (isPdfFile(file) ? 'pdf' : 'image') : previewKindFromUrl(resolvedCurrent)
+  const renderUrl = previewUrl || (!file && resolvedCurrent ? resolvedCurrent : null)
+
+  return (
+    <div className="rounded-xl border border-gray-200/80 p-3 dark:border-gray-700">
+      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{title}</label>
+      <input
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+        className="input w-full py-2.5"
+        onChange={onChange}
+        disabled={disabled}
+      />
+      {resolvedCurrent && !file ? (
+        <a
+          href={resolvedCurrent}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+        >
+          Abrir archivo en nueva pestaña
+        </a>
+      ) : null}
+      {file ? (
+        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+          {file.name} · {formatBytes(file.size)}
+        </p>
+      ) : null}
+      {renderUrl ? (
+        previewKind === 'image' ? (
+          <div className="mt-3 flex h-44 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-800/50">
+            <img src={renderUrl} alt={title} className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : (
+          <iframe
+            title={title}
+            src={renderUrl}
+            className="mt-3 h-44 w-full rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/50"
+          />
+        )
+      ) : null}
+    </div>
+  )
+}
+
 export default function ColaboradorEmpleadoGestion() {
   const { user } = useAuth()
   const { empresaId, personalId } = useParams()
-  const canEditPersonal =
-    user?.rol === ROLES.CONSULTORA || Boolean(user?.colaborador?.puede_editar_personal)
-  const canEditEmpresa =
-    user?.rol === ROLES.CONSULTORA || Boolean(user?.colaborador?.puede_editar_empresa_cliente)
+  const [tab, setTab] = useState('afp')
+  const canEditLegajo = colaboradorPuedeEditarLegajoGlobal(user)
+  const canUploadInTab = colaboradorPuedeSubirDocumentosEnModulo(user, tab)
+  const canEditEmpresa = colaboradorPuedeEditarEmpresaCliente(user)
   const [editPersonaOpen, setEditPersonaOpen] = useState(false)
   const [editEmpresaOpen, setEditEmpresaOpen] = useState(false)
   const [savingPersona, setSavingPersona] = useState(false)
@@ -136,15 +284,26 @@ export default function ColaboradorEmpleadoGestion() {
   const [licenciaFile, setLicenciaFile] = useState(null)
   const [avisoFile, setAvisoFile] = useState(null)
   const [croquisFile, setCroquisFile] = useState(null)
+  const [certNacimientoFile, setCertNacimientoFile] = useState(null)
+
+  const legajoPdfPreviewUrls = useMemo(() => {
+    const out = {}
+    if (curriculumFile && isPdfFile(curriculumFile)) out.curriculum = URL.createObjectURL(curriculumFile)
+    if (licenciaFile && isPdfFile(licenciaFile)) out.licencia = URL.createObjectURL(licenciaFile)
+    if (avisoFile && isPdfFile(avisoFile)) out.aviso = URL.createObjectURL(avisoFile)
+    if (croquisFile && isPdfFile(croquisFile)) out.croquis = URL.createObjectURL(croquisFile)
+    if (certNacimientoFile && isImageOrPdfFile(certNacimientoFile)) out.certNacimiento = URL.createObjectURL(certNacimientoFile)
+    return out
+  }, [curriculumFile, licenciaFile, avisoFile, croquisFile, certNacimientoFile])
+
+  useEffect(() => {
+    return () => {
+      Object.values(legajoPdfPreviewUrls).forEach((u) => u && URL.revokeObjectURL(u))
+    }
+  }, [legajoPdfPreviewUrls])
+
   const personaForm = useForm({
-    defaultValues: {
-      nombres: '',
-      apellidos: '',
-      ci: '',
-      correo_electronico: '',
-      cuenta_bancaria: '',
-      fecha_ingreso: '',
-    },
+    defaultValues: { ...PERSONA_FORM_EMPTY },
   })
   const empresaForm = useForm({
     defaultValues: {
@@ -168,7 +327,6 @@ export default function ColaboradorEmpleadoGestion() {
     personaForm
   const { register: regEmpresa, handleSubmit: handleSubmitEmpresa, reset: resetEmpresa, formState: empresaFs } =
     empresaForm
-  const [tab, setTab] = useState('afp')
   const [empleado, setEmpleado] = useState(null)
   const [tipos, setTipos] = useState([])
   const [docs, setDocs] = useState([])
@@ -186,6 +344,27 @@ export default function ColaboradorEmpleadoGestion() {
   const [pendingTipoId, setPendingTipoId] = useState(null)
 
   const modCfg = MODULOS.find((m) => m.key === tab) ?? MODULOS[0]
+
+  const closeEditPersona = () => {
+    setCurriculumFile(null)
+    setLicenciaFile(null)
+    setAvisoFile(null)
+    setCroquisFile(null)
+    setCertNacimientoFile(null)
+    setEditPersonaOpen(false)
+  }
+
+  const onPickLegajoPdf = (setter, allowImage = false) => (e) => {
+    const f = e.target.files?.[0] ?? null
+    const valid = allowImage ? isImageOrPdfFile(f) : isPdfFile(f)
+    if (f && !valid) {
+      toast.error(allowImage ? 'Solo se permiten archivos PDF o imagen.' : 'Solo se permiten archivos PDF.')
+      e.target.value = ''
+      setter(null)
+      return
+    }
+    setter(f)
+  }
 
   useEffect(() => {
     let c = false
@@ -304,14 +483,14 @@ export default function ColaboradorEmpleadoGestion() {
   }, [docsForModulo])
 
   const openFilePicker = (tipoId) => {
-    if (!canEditPersonal) return
+    if (!canUploadInTab) return
     setPendingTipoId(tipoId)
     fileRef.current?.click()
   }
 
   const subirArchivoTipo = useCallback(
     async (file, tipoId) => {
-      if (!file || tipoId == null || !canEditPersonal) return
+      if (!file || tipoId == null || !canUploadInTab) return
       const fd = new FormData()
       fd.append('archivo', file)
       fd.append('tipo_documento_id', String(tipoId))
@@ -329,7 +508,7 @@ export default function ColaboradorEmpleadoGestion() {
         toast.error(res.message || 'No se pudo subir el archivo.')
       }
     },
-    [canEditPersonal, empresaId, observacion, personalId, tab, loadDocs]
+    [canUploadInTab, empresaId, observacion, personalId, tab, loadDocs]
   )
 
   const onFileChange = async (e) => {
@@ -343,38 +522,47 @@ export default function ColaboradorEmpleadoGestion() {
   const onDropArchivo = (e, tipoId) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!canEditPersonal || uploadingTipoId != null) return
+    if (!canUploadInTab || uploadingTipoId != null) return
     const file = e.dataTransfer.files?.[0]
     if (file) void subirArchivoTipo(file, tipoId)
   }
 
   const onSavePersona = handleSubmitPersona(async (data) => {
+    if (!canEditLegajo) {
+      toast.error('No tienes permiso para editar el legajo.')
+      return
+    }
     setSavingPersona(true)
     setMsg(null)
     const contactos = contactosReferencia.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3)
+    if (contactos.length < 2) {
+      setSavingPersona(false)
+      toast.error('Indica al menos 2 contactos de referencia.')
+      return
+    }
     const payload = new FormData()
-    payload.append('nombres', data.nombres)
-    payload.append('apellidos', data.apellidos)
-    payload.append('ci', data.ci)
-    payload.append('cargo', empleado?.cargo || 'Personal')
-    payload.append('fecha_ingreso', data.fecha_ingreso)
-    payload.append('correo_electronico', data.correo_electronico || '')
-    payload.append('cuenta_bancaria', data.cuenta_bancaria || '')
+    const t = (v) => (v == null ? '' : String(v)).trim()
+
+    payload.append('nombres', t(data.nombres))
+    payload.append('apellidos', t(data.apellidos))
+    payload.append('ci', t(data.ci))
+    payload.append('correo_electronico', t(data.correo_electronico))
+    payload.append('cargo', 'Personal')
+    payload.append('fecha_ingreso', data.fecha_ingreso ? String(data.fecha_ingreso) : '')
+    payload.append('cuenta_bancaria', t(data.cuenta_bancaria))
     payload.append('contactos_referencia', JSON.stringify(contactos))
+
     if (curriculumFile) payload.append('curriculum_archivo', curriculumFile)
     if (licenciaFile) payload.append('licencia_conducir_archivo', licenciaFile)
     if (avisoFile) payload.append('aviso_luz_agua_archivo', avisoFile)
     if (croquisFile) payload.append('croquis_archivo', croquisFile)
+    if (certNacimientoFile) payload.append('certificado_nacimiento_archivo', certNacimientoFile)
 
     const res = await colaboradorService.updatePersonal(empresaId, personalId, payload)
     setSavingPersona(false)
     if (res.success) {
       setEmpleado(res.data)
-      setEditPersonaOpen(false)
-      setCurriculumFile(null)
-      setLicenciaFile(null)
-      setAvisoFile(null)
-      setCroquisFile(null)
+      closeEditPersona()
       toast.success('Datos del trabajador actualizados.')
     } else {
       toast.error(res.message || 'No se pudo guardar.')
@@ -430,7 +618,7 @@ export default function ColaboradorEmpleadoGestion() {
     return (
       <ColaboradorShell className="min-w-0">
         <div className="animate-fade-in rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-800 motion-reduce:animate-none dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200">
-          {msg || 'No se encontró el personal.'}
+          {msg ? sanitizeUiMessage(msg) : 'No se encontró el personal.'}
           <div className="mt-4">
             <Link
               to={`/colaborador/empresas/${empresaId}/personal`}
@@ -473,7 +661,7 @@ export default function ColaboradorEmpleadoGestion() {
           role="status"
           className="rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-100"
         >
-          {msg}
+          {sanitizeUiMessage(msg)}
         </div>
       )}
 
@@ -544,7 +732,7 @@ export default function ColaboradorEmpleadoGestion() {
               <div className="grid grid-cols-2 gap-1">
                 <button
                   type="button"
-                  disabled={cajaRegimenSaving || !canEditPersonal}
+                  disabled={cajaRegimenSaving || !canEditLegajo}
                   onClick={(e) => {
                     e.stopPropagation()
                     onSelectCajaRegimen('nacional')
@@ -560,7 +748,7 @@ export default function ColaboradorEmpleadoGestion() {
                 </button>
                 <button
                   type="button"
-                  disabled={cajaRegimenSaving || !canEditPersonal}
+                  disabled={cajaRegimenSaving || !canEditLegajo}
                   onClick={(e) => {
                     e.stopPropagation()
                     onSelectCajaRegimen('petrolera')
@@ -627,21 +815,18 @@ export default function ColaboradorEmpleadoGestion() {
                     <p className="text-xs text-gray-500 dark:text-gray-400">CI {empleado.ci ?? '—'}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {canEditPersonal ? (
+                    {canEditLegajo ? (
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
                         icon={<Pencil className="h-3.5 w-3.5" />}
                         onClick={() => {
-                          resetPersona({
-                            nombres: empleado.nombres ?? '',
-                            apellidos: empleado.apellidos ?? '',
-                            ci: empleado.ci ?? '',
-                            fecha_ingreso: isoToDateInput(empleado.fecha_ingreso),
-                            correo_electronico: empleado.correo_electronico ?? '',
-                            cuenta_bancaria: empleado.cuenta_bancaria ?? '',
-                          })
+                          setCurriculumFile(null)
+                          setLicenciaFile(null)
+                          setAvisoFile(null)
+                          setCroquisFile(null)
+                          resetPersona(personaDefaultsFromEmpleado(empleado))
                           setContactosReferencia(
                             (empleado.contactos_referencia ?? []).slice(0, 3).length
                               ? (empleado.contactos_referencia ?? []).slice(0, 3)
@@ -731,6 +916,7 @@ export default function ColaboradorEmpleadoGestion() {
                   ['Licencia', empleado.licencia_conducir_archivo_url, empleado.licencia_conducir_archivo_nombre],
                   ['Aviso luz/agua', empleado.aviso_luz_agua_archivo_url, empleado.aviso_luz_agua_archivo_nombre],
                   ['Croquis', empleado.croquis_archivo_url, empleado.croquis_archivo_nombre],
+                  ['Certificado nacimiento', empleado.certificado_nacimiento_archivo_url, empleado.certificado_nacimiento_archivo_nombre],
                 ].map(([label, url, nombre]) => (
                   <a
                     key={label}
@@ -794,7 +980,7 @@ export default function ColaboradorEmpleadoGestion() {
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                disabled={cajaRegimenSaving || !canEditPersonal}
+                disabled={cajaRegimenSaving || !canEditLegajo}
                 onClick={() => onSelectCajaRegimen('nacional')}
                 className="group flex flex-col items-start rounded-2xl border-2 border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-teal-700"
               >
@@ -803,7 +989,7 @@ export default function ColaboradorEmpleadoGestion() {
               </button>
               <button
                 type="button"
-                disabled={cajaRegimenSaving || !canEditPersonal}
+                disabled={cajaRegimenSaving || !canEditLegajo}
                 onClick={() => onSelectCajaRegimen('petrolera')}
                 className="group flex flex-col items-start rounded-2xl border-2 border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-teal-700"
               >
@@ -887,7 +1073,7 @@ export default function ColaboradorEmpleadoGestion() {
                 const formatos = tipo.formatos_permitidos || 'pdf, jpg, png, xlsx…'
                 const maxMb = tipo.tamano_maximo_mb ?? 10
                 const busy = uploadingTipoId === tipo.id
-                const uploadDisabled = busy || !canEditPersonal
+                const uploadDisabled = busy || !canUploadInTab
 
                 return (
                   <div
@@ -982,16 +1168,17 @@ export default function ColaboradorEmpleadoGestion() {
 
       <Modal
         isOpen={editPersonaOpen}
-        onClose={() => setEditPersonaOpen(false)}
+        onClose={closeEditPersona}
         title="Editar datos del trabajador"
-        size="lg"
+        size="xl"
         overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
         className="animate-scale-in rounded-2xl motion-reduce:animate-none"
-        bodyClassName="p-4 sm:p-6"
+        bodyClassName="p-4 sm:p-6 max-h-[min(90vh,720px)] overflow-y-auto"
       >
         <form onSubmit={onSavePersona} className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Actualiza el legajo básico y, si necesitas, reemplaza documentos del expediente personal.
+            Mismos datos que en "Registrar personal". La licencia es opcional y el certificado de nacimiento admite
+            imagen o PDF.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
@@ -1010,7 +1197,7 @@ export default function ColaboradorEmpleadoGestion() {
               {...regPersona('ci', { required: 'Obligatorio' })}
               error={personaFs.errors.ci?.message}
             />
-            <Input label="Correo electrónico" type="email" {...regPersona('correo_electronico')} />
+            <Input label="Correo electrónico (legajo)" type="email" {...regPersona('correo_electronico')} />
             <Input
               label="Cuenta bancaria"
               leftIcon={<Landmark className="h-4 w-4" />}
@@ -1019,7 +1206,7 @@ export default function ColaboradorEmpleadoGestion() {
             <Input label="Fecha de ingreso" type="date" {...regPersona('fecha_ingreso', { required: 'Obligatorio' })} />
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Contactos de referencia (máx. 3)
+                Contactos de referencia (mín. 2, máx. 3)
               </label>
               <div className="space-y-2">
                 {contactosReferencia.map((valor, idx) => (
@@ -1041,55 +1228,56 @@ export default function ColaboradorEmpleadoGestion() {
                 ) : null}
               </div>
             </div>
-            <div className="sm:col-span-2 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Reemplazar curriculum
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setCurriculumFile(e.target.files?.[0] ?? null)}
-                  className="input w-full py-2.5"
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Reemplazar documentos
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <LegajoPdfReplaceBlock
+                  title="Curriculum"
+                  file={curriculumFile}
+                  previewUrl={legajoPdfPreviewUrls.curriculum}
+                  currentUrl={empleado?.curriculum_archivo_url}
+                  disabled={savingPersona}
+                  onChange={onPickLegajoPdf(setCurriculumFile)}
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Reemplazar licencia (opcional)
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setLicenciaFile(e.target.files?.[0] ?? null)}
-                  className="input w-full py-2.5"
+                <LegajoPdfReplaceBlock
+                  title="Licencia de conducir (opcional)"
+                  file={licenciaFile}
+                  previewUrl={legajoPdfPreviewUrls.licencia}
+                  currentUrl={empleado?.licencia_conducir_archivo_url}
+                  disabled={savingPersona}
+                  onChange={onPickLegajoPdf(setLicenciaFile)}
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Reemplazar aviso luz/agua
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setAvisoFile(e.target.files?.[0] ?? null)}
-                  className="input w-full py-2.5"
+                <LegajoPdfReplaceBlock
+                  title="Aviso luz / agua"
+                  file={avisoFile}
+                  previewUrl={legajoPdfPreviewUrls.aviso}
+                  currentUrl={empleado?.aviso_luz_agua_archivo_url}
+                  disabled={savingPersona}
+                  onChange={onPickLegajoPdf(setAvisoFile)}
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Reemplazar croquis
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setCroquisFile(e.target.files?.[0] ?? null)}
-                  className="input w-full py-2.5"
+                <LegajoPdfReplaceBlock
+                  title="Croquis"
+                  file={croquisFile}
+                  previewUrl={legajoPdfPreviewUrls.croquis}
+                  currentUrl={empleado?.croquis_archivo_url}
+                  disabled={savingPersona}
+                  onChange={onPickLegajoPdf(setCroquisFile)}
+                />
+                <LegajoImagePdfReplaceBlock
+                  title="Certificado de nacimiento (imagen o PDF)"
+                  file={certNacimientoFile}
+                  previewUrl={legajoPdfPreviewUrls.certNacimiento}
+                  currentUrl={empleado?.certificado_nacimiento_archivo_url}
+                  disabled={savingPersona}
+                  onChange={onPickLegajoPdf(setCertNacimientoFile, true)}
                 />
               </div>
             </div>
           </div>
           <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setEditPersonaOpen(false)} disabled={savingPersona}>
+            <Button type="button" variant="secondary" onClick={closeEditPersona} disabled={savingPersona}>
               Cancelar
             </Button>
             <Button type="submit" disabled={savingPersona}>

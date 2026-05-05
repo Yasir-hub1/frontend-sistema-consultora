@@ -147,11 +147,11 @@ export const colaboradorService = {
   async updatePersonal(empresaClienteId, personalId, payload) {
     try {
       const isFormData = payload instanceof FormData
+      // POST + multipart: PATCH a menudo llega sin cuerpo en PHP-FPM/nginx; el backend acepta POST al mismo URI.
       const response = isFormData
-        ? await patch(
+        ? await post(
             `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
-            payload,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
+            payload
           )
         : await patch(
             `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`,
@@ -287,6 +287,89 @@ export const colaboradorService = {
       `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales/${id}/descargar`,
       {},
       nombreOriginal || 'declaracion'
+    )
+  },
+
+  async listDeclaracionesAguinaldo(empresaClienteId) {
+    try {
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-aguinaldo`)
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async subirDeclaracionAguinaldo(empresaClienteId, formData) {
+    try {
+      const response = await upload(
+        `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-aguinaldo`,
+        formData
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
+  async fetchDeclaracionAguinaldoVistaPreviaBlob(empresaClienteId, id) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-aguinaldo/${id}/vista-previa`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return {
+        success: true,
+        blob,
+        contentType: response.headers['content-type'] || blob.type || '',
+      }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* fall through */
+        }
+      }
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async descargarDeclaracionAguinaldo(empresaClienteId, id, nombreOriginal) {
+    await download(
+      `/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-aguinaldo/${id}/descargar`,
+      {},
+      nombreOriginal || 'aguinaldo'
     )
   },
 }

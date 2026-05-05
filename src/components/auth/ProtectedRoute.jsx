@@ -1,13 +1,14 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { normalizeRole, hasAnyRole, dashboardPathForRole } from '../../utils/roleUtils'
+import { normalizeRole, hasAnyRole, dashboardPathForRole, ROLES } from '../../utils/roleUtils'
 import LoadingSpinner from '../common/LoadingSpinner'
 
 function ProtectedRoute({ children, requiredRoles = [] }) {
-  const { isAuthenticated, loading, user } = useAuth()
+  const { isAuthenticated, loading, user, refreshUser } = useAuth()
   const location = useLocation()
   const [isInitialCheck, setIsInitialCheck] = React.useState(true)
+  const colaboradorNavBootRef = React.useRef(true)
 
   React.useEffect(() => {
     const token = localStorage.getItem('token')
@@ -17,6 +18,16 @@ function ProtectedRoute({ children, requiredRoles = [] }) {
       setIsInitialCheck(false)
     }
   }, [user, isAuthenticated])
+
+  React.useEffect(() => {
+    if (!isAuthenticated || !user) return
+    if (normalizeRole(user.rol) !== ROLES.COLABORADOR) return
+    if (colaboradorNavBootRef.current) {
+      colaboradorNavBootRef.current = false
+      return
+    }
+    void refreshUser()
+  }, [location.pathname, isAuthenticated, user?.rol, refreshUser])
 
   if (loading || (isInitialCheck && localStorage.getItem('token') && !user)) {
     return (
