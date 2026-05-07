@@ -35,6 +35,7 @@ function labelModulo(modulo) {
 
 export default function EmpresaClienteDeclaracionesMensuales() {
   const [items, setItems] = useState([])
+  const [aguinaldoItems, setAguinaldoItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [quickMesId, setQuickMesId] = useState('')
   const [selected, setSelected] = useState(() => new Set())
@@ -54,9 +55,12 @@ export default function EmpresaClienteDeclaracionesMensuales() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await empresaClienteService.listDeclaracionesMensuales()
-    if (res.success) {
-      const list = res.data?.items ?? []
+    const [resMensual, resAguinaldo] = await Promise.all([
+      empresaClienteService.listDeclaracionesMensuales(),
+      empresaClienteService.listDeclaracionesAguinaldo(),
+    ])
+    if (resMensual.success) {
+      const list = resMensual.data?.items ?? []
       setItems(list)
       setQuickMesId((prev) => {
         if (prev && list.some((i) => String(i.id) === String(prev))) return prev
@@ -65,7 +69,12 @@ export default function EmpresaClienteDeclaracionesMensuales() {
       setSelected(new Set())
     } else {
       setItems([])
-      toast.error(res.message || 'No se pudo cargar el listado.')
+      toast.error(resMensual.message || 'No se pudo cargar el listado.')
+    }
+    if (resAguinaldo.success) {
+      setAguinaldoItems(resAguinaldo.data?.items ?? [])
+    } else {
+      setAguinaldoItems([])
     }
     setLoading(false)
   }, [])
@@ -115,7 +124,11 @@ export default function EmpresaClienteDeclaracionesMensuales() {
   const onDescargarFila = async (row) => {
     setDownloadingId(row.id)
     try {
-      await empresaClienteService.descargarDeclaracionMensual(row.id, row.nombre_original)
+      if (row.tipo === 'aguinaldo') {
+        await empresaClienteService.descargarDeclaracionAguinaldo(row.id, row.nombre_original)
+      } else {
+        await empresaClienteService.descargarDeclaracionMensual(row.id, row.nombre_original)
+      }
       toast.success('Descarga iniciada.')
     } catch {
       toast.error('No se pudo descargar.')
@@ -154,8 +167,11 @@ export default function EmpresaClienteDeclaracionesMensuales() {
     })
     setPreviewLoading(true)
     setPreviewError(null)
-    setPreview({ id: row.id, nombre: row.nombre_original, objectUrl: null, kind: null })
-    const res = await empresaClienteService.fetchDeclaracionMensualVistaPreviaBlob(row.id)
+    setPreview({ id: row.id, tipo: row.tipo || 'mensual', nombre: row.nombre_original, objectUrl: null, kind: null })
+    const res =
+      row.tipo === 'aguinaldo'
+        ? await empresaClienteService.fetchDeclaracionAguinaldoVistaPreviaBlob(row.id)
+        : await empresaClienteService.fetchDeclaracionMensualVistaPreviaBlob(row.id)
     if (!res.success) {
       setPreviewError(res.message || 'No se pudo cargar la vista previa.')
       setPreviewLoading(false)
@@ -223,11 +239,11 @@ export default function EmpresaClienteDeclaracionesMensuales() {
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent motion-reduce:animate-none" />
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Cargando declaraciones…</p>
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && aguinaldoItems.length === 0 ? (
           <div className={`${motionStagger}`} style={{ animationDelay: '120ms' }}>
             <Card title="Sin declaraciones" subtitle="Aún no hay archivos disponibles" gradient>
               <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                Cuando la consultora suba la declaración mensual de tu personal, aparecerá aquí para descargarla.
+                Cuando la consultora suba declaraciones mensuales o de aguinaldo, aparecerán aquí para descargarlas.
               </p>
             </Card>
           </div>
@@ -434,6 +450,74 @@ export default function EmpresaClienteDeclaracionesMensuales() {
             </div>
               </Card>
             </div>
+
+            <div className={`${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(3)}ms` }}>
+              <Card
+                title="Declaraciones de aguinaldo"
+                subtitle={`${aguinaldoItems.length} gestión(es) con documento`}
+                gradient
+              >
+                {aguinaldoItems.length === 0 ? (
+                  <p className="py-6 text-sm text-gray-500 dark:text-gray-400">
+                    No hay declaraciones de aguinaldo disponibles para tu empresa.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm dark:border-gray-700">
+                    <table className="min-w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50/95 dark:border-gray-700 dark:bg-gray-800/90">
+                          <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Gestión</th>
+                          <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Archivo</th>
+                          <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Tamaño</th>
+                          <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
+                            Acción
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {aguinaldoItems.map((row) => (
+                          <tr key={`aguinaldo-${row.id}`} className="bg-white transition-colors dark:bg-gray-900/30">
+                            <td className="whitespace-nowrap px-3 py-3 font-medium text-gray-900 dark:text-white">
+                              {row.periodo_label}
+                            </td>
+                            <td
+                              className="max-w-[14rem] truncate px-3 py-3 text-gray-600 dark:text-gray-300"
+                              title={row.nombre_original}
+                            >
+                              {row.nombre_original}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 text-gray-500 dark:text-gray-400">
+                              {formatBytes(row.tamano_bytes)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 text-right">
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void onVerFila({ ...row, tipo: 'aguinaldo' })}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Ver
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={downloadingId === row.id}
+                                  onClick={() => void onDescargarFila({ ...row, tipo: 'aguinaldo' })}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-primary-700 transition-all duration-200 hover:border-primary-300 hover:bg-primary-50 hover:shadow-sm disabled:opacity-50 dark:border-gray-600 dark:text-primary-300 dark:hover:bg-gray-800"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  {downloadingId === row.id ? '…' : 'Descargar'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            </div>
         </>
       )}
 
@@ -512,7 +596,17 @@ export default function EmpresaClienteDeclaracionesMensuales() {
             <div className="flex h-[420px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-gray-600 dark:text-gray-300">
               <p>No hay vista previa para este formato.</p>
               {preview?.id ? (
-                <Button type="button" size="sm" icon={<Download className="h-4 w-4" />} onClick={() => void onDescargarFila({ id: preview.id, nombre_original: preview.nombre })}>
+                <Button
+                  type="button"
+                  size="sm"
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={() =>
+                    void onDescargarFila({
+                      id: preview.id,
+                      nombre_original: preview.nombre,
+                      tipo: preview.tipo || 'mensual',
+                    })}
+                >
                   Descargar archivo
                 </Button>
               ) : null}
