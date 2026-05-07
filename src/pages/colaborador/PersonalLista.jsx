@@ -50,12 +50,11 @@ import { sanitizeUiMessage } from '../../utils/uiMessage'
 const DECLARACION_CAMPOS_POR_MODULO = {
   afp: ['monto_aportes_gestoras', 'monto_aporte_solidario_gestora'],
   caja: ['monto_deposito_cns'],
-  ministerio: ['monto_total_ganado'],
-}
-
-/** Solo lectura en historial: datos guardados antes de acotar el formulario de Ministerio. */
-const DECLARACION_CAMPOS_HISTORIAL_LEGACY = {
-  ministerio: ['monto_planilla_mensual_mdt', 'monto_seprec_registro_poder_consultora'],
+  ministerio: [
+    'monto_total_ganado',
+    'monto_planilla_mensual_mdt',
+    'monto_seprec_registro_poder_consultora',
+  ],
 }
 
 const DECLARACION_LABELS = {
@@ -63,7 +62,7 @@ const DECLARACION_LABELS = {
   monto_deposito_cns: 'Depósito CNS',
   monto_aportes_gestoras: 'Aportes Gestoras',
   monto_aporte_solidario_gestora: 'Aporte solidario Gestora',
-  monto_planilla_mensual_mdt: 'Planilla mensual Septiembre (MDT)',
+  monto_planilla_mensual_mdt: 'Planilla MDT (Mensual)',
   monto_seprec_registro_poder_consultora: 'SEPREC registro de poder a consultora',
 }
 
@@ -119,10 +118,7 @@ function pickImageOrPdf(setFile) {
 
 function resumenMontosDeclaracionFila(row) {
   const m = String(row.modulo || '').toLowerCase()
-  const keys = [
-    ...(DECLARACION_CAMPOS_POR_MODULO[m] ?? []),
-    ...(DECLARACION_CAMPOS_HISTORIAL_LEGACY[m] ?? []),
-  ]
+  const keys = DECLARACION_CAMPOS_POR_MODULO[m] ?? []
   const partes = []
   for (const k of keys) {
     const v = row[k]
@@ -141,7 +137,7 @@ const DECL_MODULO_META = {
   caja: { titulo: 'CAJA', descripcion: 'Depósito CNS y afines', icon: Building2, ring: 'ring-sky-500/30' },
   ministerio: {
     titulo: 'Ministerio de Trabajo',
-    descripcion: 'Total ganado declarado',
+    descripcion: 'Total ganado, MDT mensual y SEPREC',
     icon: Landmark,
     ring: 'ring-amber-500/30',
   },

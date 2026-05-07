@@ -25,6 +25,14 @@ function formatBytes(n) {
   return `${(v / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function labelModulo(modulo) {
+  const m = String(modulo || '').toLowerCase()
+  if (m === 'afp') return 'AFP'
+  if (m === 'caja') return 'CAJA'
+  if (m === 'ministerio') return 'MDT'
+  return String(modulo || '').toUpperCase() || '—'
+}
+
 export default function EmpresaClienteDeclaracionesMensuales() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -246,7 +254,7 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                   >
                     {items.map((i) => (
                       <option key={i.id} value={String(i.id)}>
-                        {i.periodo_label} · {String(i.modulo || '').toUpperCase()}
+                        {i.periodo_label} · {labelModulo(i.modulo)} · {i.nombre_original}
                       </option>
                     ))}
                   </select>
@@ -319,6 +327,9 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 dark:text-white">{row.periodo_label}</p>
+                        <p className="mt-1 text-xs font-semibold text-primary-700 dark:text-primary-300">
+                          Módulo: {labelModulo(row.modulo)}
+                        </p>
                         <p className="mt-1 break-words text-sm text-gray-600 dark:text-gray-300">{row.nombre_original}</p>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatBytes(row.tamano_bytes)}</p>
                         <button
@@ -351,6 +362,7 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                   <tr className="border-b border-gray-200 bg-gray-50/95 dark:border-gray-700 dark:bg-gray-800/90">
                     <th className="w-10 px-3 py-3" aria-label="Seleccionar" />
                     <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Mes</th>
+                    <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Módulo</th>
                     <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Archivo</th>
                     <th className="px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">Tamaño</th>
                     <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
@@ -383,6 +395,9 @@ export default function EmpresaClienteDeclaracionesMensuales() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 font-medium text-gray-900 dark:text-white">
                           {row.periodo_label}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-gray-600 dark:text-gray-300">
+                          {labelModulo(row.modulo)}
                         </td>
                         <td className="max-w-[14rem] truncate px-3 py-3 text-gray-600 dark:text-gray-300" title={row.nombre_original}>
                           {row.nombre_original}

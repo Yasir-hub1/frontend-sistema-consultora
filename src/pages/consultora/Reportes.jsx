@@ -326,8 +326,9 @@ export default function ConsultoraReportes() {
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           <Building2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
-          Los importes provienen de las declaraciones mensuales cargadas por módulo; el PDF usa logo, cuenta bancaria y
-          datos de contacto de la configuración de la consultora.
+          Los importes provienen de las declaraciones mensuales cargadas por módulo (incluyendo Ministerio: Total
+          ganado, Planilla MDT mensual y SEPREC); el PDF usa logo, cuenta bancaria y datos de contacto de la
+          configuración de la consultora.
         </p>
       </Card>
 

@@ -25,11 +25,33 @@ function portalBadge(habilitado) {
   )
 }
 
+function splitNombreCompleto(nombres, apellidos) {
+  return [nombres, apellidos].filter(Boolean).join(' ').trim()
+}
+
+function toFormValues(row) {
+  return {
+    nombre: row?.nombre ?? '',
+    nit: row?.nit ?? '',
+    razon_social: row?.razon_social ?? '',
+    ciudad: row?.ciudad ?? '',
+    departamento: row?.departamento ?? '',
+    direccion: row?.direccion ?? '',
+    telefono: row?.telefono ?? '',
+    correo_contacto: row?.correo_empresa ?? '',
+    representante_nombre: splitNombreCompleto(row?.rep_legal_nombres, row?.rep_legal_apellidos),
+    representante_ci: row?.rep_legal_ci ?? '',
+    actividad_economica: row?.actividad_economica ?? '',
+    matricula_comercio: row?.matricula_comercio ?? '',
+  }
+}
+
 export default function ConsultoraMisEmpresas() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingEmpresa, setEditingEmpresa] = useState(null)
 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(PAGINATION_CONFIG.DEFAULT_PAGE_SIZE)
@@ -108,6 +130,7 @@ export default function ConsultoraMisEmpresas() {
 
   const closeModal = () => {
     setModalOpen(false)
+    setEditingEmpresa(null)
     reset()
   }
 
@@ -118,6 +141,27 @@ export default function ConsultoraMisEmpresas() {
       closeModal()
       await load()
       setMsg('Empresa cliente registrada correctamente.')
+    } else setMsg(res.message)
+  }
+
+  const onEdit = (row) => {
+    setMsg(null)
+    setEditingEmpresa(row)
+    reset(toFormValues(row))
+    setModalOpen(true)
+  }
+
+  const onSave = async (data) => {
+    if (!editingEmpresa?.id) {
+      await onCreate(data)
+      return
+    }
+    setMsg(null)
+    const res = await consultoraService.patchEmpresaCliente(editingEmpresa.id, data)
+    if (res.success) {
+      closeModal()
+      await load()
+      setMsg('Empresa cliente actualizada correctamente.')
     } else setMsg(res.message)
   }
 
@@ -149,6 +193,8 @@ export default function ConsultoraMisEmpresas() {
           type="button"
           onClick={() => {
             setMsg(null)
+            setEditingEmpresa(null)
+            reset()
             setModalOpen(true)
           }}
           icon={<Plus className="h-4 w-4" />}
@@ -273,13 +319,18 @@ export default function ConsultoraMisEmpresas() {
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 dark:border-gray-800">
-                      <Link
-                        to={`/consultora/mis-empresas/${r.id}`}
-                        className="btn btn-outline btn-sm inline-flex items-center gap-2"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Perfil y acceso
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="secondary" size="sm" onClick={() => onEdit(r)}>
+                          Editar
+                        </Button>
+                        <Link
+                          to={`/consultora/mis-empresas/${r.id}`}
+                          className="btn btn-outline btn-sm inline-flex items-center gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Perfil y acceso
+                        </Link>
+                      </div>
                     </div>
                   </li>
                 )
@@ -334,13 +385,22 @@ export default function ConsultoraMisEmpresas() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">{portalBadge(portalOn)}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <Link
-                            to={`/consultora/mis-empresas/${r.id}`}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                          >
-                            Detalle
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
+                          <div className="inline-flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => onEdit(r)}
+                              className="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                            >
+                              Editar
+                            </button>
+                            <Link
+                              to={`/consultora/mis-empresas/${r.id}`}
+                              className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                            >
+                              Detalle
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -364,11 +424,11 @@ export default function ConsultoraMisEmpresas() {
       <Modal
         isOpen={modalOpen}
         onClose={closeModal}
-        title="Nueva empresa cliente"
+        title={editingEmpresa ? 'Editar empresa cliente' : 'Nueva empresa cliente'}
         size="lg"
         bodyClassName="p-4 sm:p-6"
       >
-        <form onSubmit={handleSubmit(onCreate)} className="grid gap-3 sm:grid-cols-2">
+        <form onSubmit={handleSubmit(onSave)} className="grid gap-3 sm:grid-cols-2">
           <Input label="Nombre" {...register('nombre', { required: 'Obligatorio' })} />
           <Input label="NIT" {...register('nit', { required: 'Obligatorio' })} />
           <Input label="Razón social" className="sm:col-span-2" {...register('razon_social')} />
@@ -386,7 +446,7 @@ export default function ConsultoraMisEmpresas() {
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting} icon={<Plus className="h-4 w-4" />}>
-              {isSubmitting ? 'Guardando…' : 'Registrar empresa'}
+              {isSubmitting ? 'Guardando…' : editingEmpresa ? 'Guardar cambios' : 'Registrar empresa'}
             </Button>
           </div>
         </form>
