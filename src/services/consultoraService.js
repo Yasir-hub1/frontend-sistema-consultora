@@ -325,7 +325,10 @@ export const consultoraService = {
     try {
       const queryParams = stripEmpty({
         mes_gestion: params.mes_gestion || '',
+        anio: params.anio || '',
         modulo: params.modulo || '',
+        empresa_cliente_id: params.empresa_cliente_id || '',
+        tipo_declaracion: params.tipo_declaracion || '',
         page: params.page || 1,
         per_page: params.per_page || 50,
       })
@@ -339,11 +342,28 @@ export const consultoraService = {
     }
   },
 
-  async fetchReporteDeclaracionPreviewBlob(id) {
+  async listEmpresasClienteReporte() {
     try {
-      const response = await api.get(`/consultora/reportes/declaraciones/${id}/vista-previa`, {
-        responseType: 'blob',
-      })
+      const response = await get('/consultora/reportes/empresas-cliente')
+      if (response.data.success) {
+        const rows = response.data.data ?? []
+        return { success: true, data: Array.isArray(rows) ? rows : [], message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: [] }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH, data: [] }
+    }
+  },
+
+  async fetchReporteDeclaracionPreviewBlob(id, tipoDeclaracion = 'mensual') {
+    try {
+      const response = await api.get(
+        `/consultora/reportes/declaraciones/${id}/vista-previa`,
+        {
+          params: stripEmpty({ tipo_declaracion: tipoDeclaracion }),
+          responseType: 'blob',
+        }
+      )
       const blob = response.data
       if (blob instanceof Blob && blob.type?.includes('application/json')) {
         const text = await blob.text()
@@ -360,8 +380,57 @@ export const consultoraService = {
     }
   },
 
-  async descargarReporteDeclaracion(id, nombreOriginal) {
-    return download(`/consultora/reportes/declaraciones/${id}/descargar`, {}, nombreOriginal || `declaracion-${id}.pdf`)
+  async descargarReporteDeclaracion(id, nombreOriginal, tipoDeclaracion = 'mensual') {
+    try {
+      const response = await api.get(`/consultora/reportes/declaraciones/${id}/descargar`, {
+        params: stripEmpty({ tipo_declaracion: tipoDeclaracion }),
+        responseType: 'blob',
+      })
+
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+
+      const cd = response.headers['content-disposition'] || ''
+      let finalName = nombreOriginal || `declaracion-${id}.pdf`
+      const m = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+      if (m?.[1]) {
+        try {
+          finalName = decodeURIComponent(m[1].replace(/"/g, '').trim()) || finalName
+        } catch {
+          finalName = m[1].replace(/"/g, '').trim() || finalName
+        }
+      }
+
+      const downloadUrl = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]))
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = finalName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      return { success: true }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
   },
 
   async getResumenAportesMensual(params) {

@@ -15,8 +15,17 @@ function formatBytes(n) {
   return `${(v / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function rowTipo(r) {
+  if (r?.tipo_declaracion) return String(r.tipo_declaracion)
+  if (String(r?.modulo || '').toLowerCase() === 'aguinaldo') return 'aguinaldo'
+  return 'mensual'
+}
+
 export default function ConsultoraReportes() {
   const [mesGestion, setMesGestion] = useState(new Date().toISOString().slice(0, 7))
+  const [anioGestion, setAnioGestion] = useState(new Date().getFullYear())
+  const [tipoDeclaracion, setTipoDeclaracion] = useState('todos')
+  const [empresaFiltroId, setEmpresaFiltroId] = useState('')
   const [modulo, setModulo] = useState('')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -35,8 +44,11 @@ export default function ConsultoraReportes() {
   const load = async () => {
     setLoading(true)
     const res = await consultoraService.listReportesDeclaraciones({
-      mes_gestion: mesGestion,
-      modulo,
+      mes_gestion: tipoDeclaracion === 'mensual' ? mesGestion : '',
+      anio: tipoDeclaracion === 'aguinaldo' ? anioGestion : '',
+      modulo: tipoDeclaracion === 'mensual' ? modulo : '',
+      tipo_declaracion: tipoDeclaracion,
+      empresa_cliente_id: empresaFiltroId ? Number(empresaFiltroId) : null,
       per_page: 200,
     })
     setLoading(false)
@@ -54,18 +66,47 @@ export default function ConsultoraReportes() {
 
   useEffect(() => {
     const loadEmpresas = async () => {
+      const res = await consultoraService.listEmpresasClienteReporte()
+      if (res.success) {
+        const fromReportes = Array.isArray(res.data) ? res.data : []
+        // En algunos entornos un usuario de tipo consultora puede estar ligado por colaborador.
+        // Mergeamos con el listado paginado para evitar perder empresas en el selector.
+        const merged = [...fromReportes]
+        const seen = new Set(fromReportes.map((e) => Number(e.id)))
+        let page = 1
+        let lastPage = 1
+        do {
+          const r = await consultoraService.listEmpresasCliente({ per_page: 100, page })
+          if (!r.success) break
+          const chunk = r.data?.data ?? []
+          chunk.forEach((e) => {
+            const id = Number(e.id)
+            if (!seen.has(id)) {
+              seen.add(id)
+              merged.push(e)
+            }
+          })
+          lastPage = r.data?.last_page ?? 1
+          page += 1
+        } while (page <= lastPage)
+        setEmpresasCliente(merged)
+        return
+      }
       const acc = []
       let page = 1
       let lastPage = 1
       do {
-        const res = await consultoraService.listEmpresasCliente({ per_page: 100, page })
-        if (!res.success) break
-        const chunk = res.data?.data ?? []
+        const r = await consultoraService.listEmpresasCliente({ per_page: 100, page })
+        if (!r.success) break
+        const chunk = r.data?.data ?? []
         acc.push(...chunk)
-        lastPage = res.data?.last_page ?? 1
+        lastPage = r.data?.last_page ?? 1
         page += 1
       } while (page <= lastPage)
       setEmpresasCliente(acc)
+      if (acc.length === 0) {
+        toast.error(res.message || 'No se pudo cargar empresas para el filtro.')
+      }
     }
     void loadEmpresas()
   }, [])
@@ -77,7 +118,7 @@ export default function ConsultoraReportes() {
 
   const onPreview = async (row) => {
     setPreviewLoadingId(row.id)
-    const res = await consultoraService.fetchReporteDeclaracionPreviewBlob(row.id)
+    const res = await consultoraService.fetchReporteDeclaracionPreviewBlob(row.id, rowTipo(row))
     setPreviewLoadingId(null)
     if (!res.success || !res.blob) {
       toast.error(res.message || 'No se pudo abrir la vista previa.')
@@ -85,6 +126,19 @@ export default function ConsultoraReportes() {
     }
     const url = URL.createObjectURL(res.blob)
     setPreview({ id: row.id, title: row.nombre_original, url })
+  }
+
+  const onDescargarDocumento = async (row) => {
+    const res = await consultoraService.descargarReporteDeclaracion(
+      row.id,
+      row.nombre_original,
+      rowTipo(row)
+    )
+    if (!res?.success) {
+      toast.error(res?.message || 'No se pudo descargar el documento.')
+      return
+    }
+    toast.success('Descarga iniciada.')
   }
 
   const onClosePreview = () => {
@@ -172,6 +226,10 @@ export default function ConsultoraReportes() {
   }
 
   const onExportPdf = async () => {
+    if (tipoDeclaracion !== 'mensual') {
+      toast.error('La exportación consolidada aplica solo a declaraciones mensuales.')
+      return
+    }
     if (!mesGestion) {
       toast.error('Selecciona un mes.')
       return
@@ -333,22 +391,64 @@ export default function ConsultoraReportes() {
       </Card>
 
       <Card title="Filtros" subtitle="Parametriza el reporte y ejecuta búsqueda" gradient>
-        <div className="grid gap-3 md:grid-cols-4">
-          <Input
-            label="Mes gestión"
-            type="month"
-            value={mesGestion}
-            onChange={(e) => setMesGestion(e.target.value)}
-          />
+        <div className="grid gap-3 md:grid-cols-5">
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</label>
-            <select value={modulo} onChange={(e) => setModulo(e.target.value)} className="input w-full py-2.5">
-              <option value="">Todos</option>
-              <option value="afp">AFP</option>
-              <option value="caja">CAJA</option>
-              <option value="ministerio">Ministerio</option>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo</label>
+            <select
+              value={tipoDeclaracion}
+              onChange={(e) => setTipoDeclaracion(e.target.value)}
+              className="input w-full py-2.5"
+            >
+              <option value="mensual">Declaración mensual</option>
+              <option value="aguinaldo">Declaración aguinaldo</option>
+              <option value="todos">Todos</option>
             </select>
           </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Empresa cliente</label>
+            <select
+              value={empresaFiltroId}
+              onChange={(e) => setEmpresaFiltroId(e.target.value)}
+              className="input w-full py-2.5"
+            >
+              <option value="">Todas</option>
+              {empresasCliente.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre || e.razon_social || `Empresa #${e.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          {tipoDeclaracion !== 'aguinaldo' ? (
+            <Input
+              label="Mes gestión"
+              type="month"
+              value={mesGestion}
+              onChange={(e) => setMesGestion(e.target.value)}
+            />
+          ) : (
+            <Input
+              label="Año"
+              type="number"
+              min="2000"
+              max="2100"
+              value={anioGestion}
+              onChange={(e) => setAnioGestion(Number(e.target.value || new Date().getFullYear()))}
+            />
+          )}
+          {tipoDeclaracion === 'mensual' ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</label>
+              <select value={modulo} onChange={(e) => setModulo(e.target.value)} className="input w-full py-2.5">
+                <option value="">Todos</option>
+                <option value="afp">AFP</option>
+                <option value="caja">CAJA</option>
+                <option value="ministerio">Ministerio</option>
+              </select>
+            </div>
+          ) : (
+            <div />
+          )}
           <div className="flex items-end">
             <Button type="button" className="w-full" onClick={() => void load()}>
               Buscar
@@ -361,7 +461,7 @@ export default function ConsultoraReportes() {
               className="w-full"
               icon={<Download className="h-4 w-4" />}
               onClick={() => void onExportPdf()}
-              disabled={exporting}
+              disabled={exporting || tipoDeclaracion !== 'mensual'}
             >
               {exporting ? 'Exportando…' : 'Exportar PDF'}
             </Button>
@@ -397,9 +497,9 @@ export default function ConsultoraReportes() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {rows.map((r) => (
-                  <tr key={r.id} className="bg-white dark:bg-gray-900/30">
+                  <tr key={`${r.tipo_declaracion || 'mensual'}-${r.id}`} className="bg-white dark:bg-gray-900/30">
                     <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.empresa_nombre || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.mes_gestion}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.periodo_label || r.mes_gestion}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{String(r.modulo || '').toUpperCase()}</td>
                     <td className="max-w-[14rem] truncate px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.nombre_original}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-gray-500 dark:text-gray-400">{formatBytes(r.tamano_bytes)}</td>
@@ -416,7 +516,7 @@ export default function ConsultoraReportes() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void consultoraService.descargarReporteDeclaracion(r.id, r.nombre_original)}
+                          onClick={() => void onDescargarDocumento(r)}
                           className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-50 dark:border-gray-600 dark:text-primary-300 dark:hover:bg-gray-800"
                         >
                           <Download className="h-3.5 w-3.5" />
