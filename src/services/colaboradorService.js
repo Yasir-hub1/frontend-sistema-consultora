@@ -129,6 +129,42 @@ export const colaboradorService = {
     }
   },
 
+  /**
+   * Descarga el archivo del legajo con autenticación (evita abrir /storage en otra pestaña).
+   * @param {string} tipo curriculum|licencia|aviso|croquis|certificado_nacimiento
+   */
+  async fetchLegajoArchivoBlob(empresaClienteId, personalId, tipo) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}/legajo/${tipo}/stream`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      const out = blob instanceof Blob ? blob : new Blob([blob])
+      return { success: true, blob: out, mime: out.type || '' }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob && data.type?.includes('application/json')) {
+        try {
+          const j = JSON.parse(await data.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* fall through */
+        }
+      }
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
   async createPersonal(empresaClienteId, payload) {
     try {
       const isFormData = payload instanceof FormData
@@ -140,6 +176,157 @@ export const colaboradorService = {
       }
       return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
     } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
+  async descargarPlantillaPersonalMasivo(empresaClienteId) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/plantilla-registro-masivo`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      const cd = response.headers['content-disposition'] || ''
+      let filename = 'plantilla_registro_masivo_personal.xlsx'
+      const m = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+      if (m?.[1]) {
+        try {
+          filename = decodeURIComponent(m[1].replace(/"/g, '').trim()) || filename
+        } catch {
+          filename = m[1].replace(/"/g, '').trim() || filename
+        }
+      }
+      const downloadUrl = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]))
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      return { success: true }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async listOtrosDocumentosEmpresa(empresaClienteId) {
+    try {
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/otros-documentos`)
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async subirOtroDocumentoEmpresa(empresaClienteId, file, descripcion) {
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      if (descripcion != null && String(descripcion).trim() !== '') {
+        formData.append('descripcion', String(descripcion).trim())
+      }
+      const response = await upload(
+        `/colaborador/empresas-cliente/${empresaClienteId}/otros-documentos`,
+        formData
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
+  async fetchOtroDocumentoEmpresaVistaPreviaBlob(empresaClienteId, id) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/otros-documentos/${id}/vista-previa`,
+        { responseType: 'blob' }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return {
+        success: true,
+        blob,
+        contentType: response.headers['content-type'] || blob.type || '',
+      }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* fallthrough */
+        }
+      }
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async descargarOtroDocumentoEmpresa(empresaClienteId, id, nombreOriginal) {
+    await download(
+      `/colaborador/empresas-cliente/${empresaClienteId}/otros-documentos/${id}/descargar`,
+      {},
+      nombreOriginal || `documento-${id}.pdf`
+    )
+  },
+
+  async cargarPersonalMasivo(empresaClienteId, file) {
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const response = await api.post(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/registro-masivo`,
+        formData
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      const d = error.response?.data
+      if (d instanceof Blob) {
+        try {
+          const j = JSON.parse(await d.text())
+          return { success: false, message: j.message || MESSAGES.ERROR.SERVER_ERROR }
+        } catch {
+          /* fallthrough */
+        }
+      }
       return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
     }
   },

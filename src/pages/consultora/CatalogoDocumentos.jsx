@@ -56,7 +56,6 @@ export default function ConsultoraCatalogoDocumentos() {
   }
 
   const openEdit = (row) => {
-    if (row.es_sistema) return
     setEditing(row)
     setFormNombre(row.nombre || '')
     setFormDesc(row.descripcion || '')
@@ -114,7 +113,6 @@ export default function ConsultoraCatalogoDocumentos() {
   }
 
   const toggleActivo = async (row) => {
-    if (row.es_sistema) return
     const res = await consultoraService.updateTipoDocumentoCatalogo(row.id, { activo: !row.activo })
     if (res.success) {
       toast.success(row.activo ? 'Desactivado' : 'Activado')
@@ -130,8 +128,8 @@ export default function ConsultoraCatalogoDocumentos() {
           Catálogo de documentos
         </h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Tipos que ven tus colaboradores al subir archivos por módulo. Los marcados como sistema son plantilla global;
-          puedes añadir los de tu firma.
+          Tipos que ven tus colaboradores al subir archivos por módulo. Los de origen sistema son plantilla global
+          (editables aquí; los cambios aplican a todas las firmas). Podés añadir tipos propios de tu firma.
         </p>
       </div>
 
@@ -231,24 +229,24 @@ export default function ConsultoraCatalogoDocumentos() {
                     <td className="py-3 pr-3">{r.es_periodico ? 'Sí' : '—'}</td>
                     <td className="py-3 pr-3">{r.activo ? 'Activo' : 'Off'}</td>
                     <td className="py-3 text-right">
-                      {!r.es_sistema && (
-                        <div className="flex justify-end gap-1">
-                          <button
-                            type="button"
-                            title="Editar"
-                            onClick={() => openEdit(r)}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            title={r.activo ? 'Desactivar' : 'Activar'}
-                            onClick={() => toggleActivo(r)}
-                            className="rounded-lg px-2 py-1 text-[10px] font-bold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20"
-                          >
-                            {r.activo ? 'Off' : 'On'}
-                          </button>
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          title="Editar"
+                          onClick={() => openEdit(r)}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title={r.activo ? 'Desactivar' : 'Activar'}
+                          onClick={() => toggleActivo(r)}
+                          className="rounded-lg px-2 py-1 text-[10px] font-bold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+                        >
+                          {r.activo ? 'Off' : 'On'}
+                        </button>
+                        {!r.es_sistema ? (
                           <button
                             type="button"
                             title="Eliminar"
@@ -257,8 +255,8 @@ export default function ConsultoraCatalogoDocumentos() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        </div>
-                      )}
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -271,9 +269,21 @@ export default function ConsultoraCatalogoDocumentos() {
       <Modal
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editing ? 'Editar tipo' : 'Nuevo tipo de documento'}
+        title={
+          editing
+            ? editing.es_sistema
+              ? 'Editar tipo (origen sistema)'
+              : 'Editar tipo'
+            : 'Nuevo tipo de documento'
+        }
       >
         <div className="space-y-3">
+          {editing?.es_sistema ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Este tipo es plantilla global. Los cambios de nombre, descripción, obligatoriedad, periodicidad y orden se
+              aplican en el catálogo base compartido.
+            </p>
+          ) : null}
           <Input label="Nombre" value={formNombre} onChange={(e) => setFormNombre(e.target.value)} />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>

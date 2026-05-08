@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Building2,
   ChevronRight,
+  Eye,
   FileText,
   CreditCard,
   LayoutGrid,
@@ -28,18 +29,6 @@ import {
   colaboradorPuedeSubirDocumentosEnModulo,
 } from '../../utils/colaboradorPermisos'
 import { sanitizeUiMessage } from '../../utils/uiMessage'
-import { getApiOrigin } from '../../utils/constants'
-
-/** URL absoluta para iframes / enlaces a PDFs en `/storage/...`. */
-function absoluteBackendUrl(pathOrUrl) {
-  if (!pathOrUrl) return null
-  const s = String(pathOrUrl).trim()
-  if (!s) return null
-  if (/^https?:\/\//i.test(s)) return s
-  const origin = getApiOrigin()
-  const path = s.startsWith('/') ? s : `/${s}`
-  return origin ? `${origin}${path}` : path
-}
 
 const MODULOS = [
   {
@@ -181,9 +170,8 @@ function personaDefaultsFromEmpleado(e) {
   }
 }
 
-function LegajoPdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, disabled }) {
-  const resolvedCurrent = absoluteBackendUrl(currentUrl)
-  const iframeSrc = previewUrl || (!file && resolvedCurrent ? resolvedCurrent : null)
+function LegajoPdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, onVerServer, verLoading, disabled }) {
+  const hasServerDoc = Boolean(currentUrl) && !file
 
   return (
     <div className="rounded-xl border border-gray-200/80 p-3 dark:border-gray-700">
@@ -195,25 +183,26 @@ function LegajoPdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, 
         onChange={onChange}
         disabled={disabled}
       />
-      {resolvedCurrent && !file ? (
-        <a
-          href={resolvedCurrent}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+      {hasServerDoc ? (
+        <button
+          type="button"
+          disabled={disabled || verLoading}
+          onClick={() => onVerServer?.()}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline disabled:opacity-50 dark:text-primary-400"
         >
-          Abrir PDF en nueva pestaña
-        </a>
+          <Eye className="h-3.5 w-3.5" />
+          {verLoading ? 'Abriendo…' : 'Ver documento'}
+        </button>
       ) : null}
       {file ? (
         <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
           {file.name} · {formatBytes(file.size)}
         </p>
       ) : null}
-      {iframeSrc ? (
+      {previewUrl ? (
         <iframe
           title={title}
-          src={iframeSrc}
+          src={previewUrl}
           className="mt-3 h-44 w-full rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/50"
         />
       ) : null}
@@ -221,10 +210,9 @@ function LegajoPdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, 
   )
 }
 
-function LegajoImagePdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, disabled }) {
-  const resolvedCurrent = absoluteBackendUrl(currentUrl)
-  const previewKind = file ? (isPdfFile(file) ? 'pdf' : 'image') : previewKindFromUrl(resolvedCurrent)
-  const renderUrl = previewUrl || (!file && resolvedCurrent ? resolvedCurrent : null)
+function LegajoImagePdfReplaceBlock({ title, file, previewUrl, currentUrl, onChange, onVerServer, verLoading, disabled }) {
+  const hasServerDoc = Boolean(currentUrl) && !file
+  const previewKind = file ? (isPdfFile(file) ? 'pdf' : 'image') : 'pdf'
 
   return (
     <div className="rounded-xl border border-gray-200/80 p-3 dark:border-gray-700">
@@ -236,30 +224,31 @@ function LegajoImagePdfReplaceBlock({ title, file, previewUrl, currentUrl, onCha
         onChange={onChange}
         disabled={disabled}
       />
-      {resolvedCurrent && !file ? (
-        <a
-          href={resolvedCurrent}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+      {hasServerDoc ? (
+        <button
+          type="button"
+          disabled={disabled || verLoading}
+          onClick={() => onVerServer?.()}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline disabled:opacity-50 dark:text-primary-400"
         >
-          Abrir archivo en nueva pestaña
-        </a>
+          <Eye className="h-3.5 w-3.5" />
+          {verLoading ? 'Abriendo…' : 'Ver documento'}
+        </button>
       ) : null}
       {file ? (
         <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
           {file.name} · {formatBytes(file.size)}
         </p>
       ) : null}
-      {renderUrl ? (
+      {previewUrl ? (
         previewKind === 'image' ? (
           <div className="mt-3 flex h-44 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-800/50">
-            <img src={renderUrl} alt={title} className="max-h-full max-w-full object-contain" />
+            <img src={previewUrl} alt={title} className="max-h-full max-w-full object-contain" />
           </div>
         ) : (
           <iframe
             title={title}
-            src={renderUrl}
+            src={previewUrl}
             className="mt-3 h-44 w-full rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/50"
           />
         )
@@ -301,6 +290,51 @@ export default function ColaboradorEmpleadoGestion() {
       Object.values(legajoPdfPreviewUrls).forEach((u) => u && URL.revokeObjectURL(u))
     }
   }, [legajoPdfPreviewUrls])
+
+  const [legajoViewer, setLegajoViewer] = useState(null)
+  const [legajoStreamLoadingTipo, setLegajoStreamLoadingTipo] = useState(null)
+
+  const closeLegajoViewer = useCallback(() => {
+    setLegajoViewer((v) => {
+      if (v?.url) URL.revokeObjectURL(v.url)
+      return null
+    })
+  }, [])
+
+  const openLegajoStream = useCallback(
+    async (tipo, title, hintNombre) => {
+      if (!empresaId || !personalId) return
+      setLegajoStreamLoadingTipo(tipo)
+      const res = await colaboradorService.fetchLegajoArchivoBlob(empresaId, personalId, tipo)
+      setLegajoStreamLoadingTipo(null)
+      if (!res.success) {
+        toast.error(res.message || 'No se pudo abrir el archivo.')
+        return
+      }
+      const blob = res.blob
+      const mime = (res.mime || blob.type || '').toLowerCase()
+      let kind = 'pdf'
+      if (tipo === 'certificado_nacimiento') {
+        if (mime.startsWith('image/')) kind = 'image'
+        else if (hintNombre && previewKindFromUrl(String(hintNombre)) === 'image') kind = 'image'
+      }
+      setLegajoViewer((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url)
+        const url = URL.createObjectURL(blob)
+        return { title: title || 'Documento', url, kind }
+      })
+    },
+    [empresaId, personalId]
+  )
+
+  useEffect(() => {
+    return () => {
+      setLegajoViewer((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url)
+        return null
+      })
+    }
+  }, [])
 
   const personaForm = useForm({
     defaultValues: { ...PERSONA_FORM_EMPTY },
@@ -351,6 +385,7 @@ export default function ColaboradorEmpleadoGestion() {
     setAvisoFile(null)
     setCroquisFile(null)
     setCertNacimientoFile(null)
+    closeLegajoViewer()
     setEditPersonaOpen(false)
   }
 
@@ -912,26 +947,36 @@ export default function ColaboradorEmpleadoGestion() {
               </div>
               <div className="grid grid-cols-1 gap-2 pt-2 text-xs">
                 {[
-                  ['Curriculum', empleado.curriculum_archivo_url, empleado.curriculum_archivo_nombre],
-                  ['Licencia', empleado.licencia_conducir_archivo_url, empleado.licencia_conducir_archivo_nombre],
-                  ['Aviso luz/agua', empleado.aviso_luz_agua_archivo_url, empleado.aviso_luz_agua_archivo_nombre],
-                  ['Croquis', empleado.croquis_archivo_url, empleado.croquis_archivo_nombre],
-                  ['Certificado nacimiento', empleado.certificado_nacimiento_archivo_url, empleado.certificado_nacimiento_archivo_nombre],
-                ].map(([label, url, nombre]) => (
-                  <a
+                  ['Curriculum', 'curriculum', empleado.curriculum_archivo_url, empleado.curriculum_archivo_nombre],
+                  ['Licencia', 'licencia', empleado.licencia_conducir_archivo_url, empleado.licencia_conducir_archivo_nombre],
+                  ['Aviso luz/agua', 'aviso', empleado.aviso_luz_agua_archivo_url, empleado.aviso_luz_agua_archivo_nombre],
+                  ['Croquis', 'croquis', empleado.croquis_archivo_url, empleado.croquis_archivo_nombre],
+                  [
+                    'Certificado nacimiento',
+                    'certificado_nacimiento',
+                    empleado.certificado_nacimiento_archivo_url,
+                    empleado.certificado_nacimiento_archivo_nombre,
+                  ],
+                ].map(([label, tipo, url, nombre]) => (
+                  <button
                     key={label}
-                    href={url || '#'}
-                    target="_blank"
-                    rel="noreferrer"
+                    type="button"
+                    disabled={!url || legajoStreamLoadingTipo === tipo}
+                    onClick={() => url && void openLegajoStream(tipo, label, nombre)}
                     className={clsx(
-                      'rounded-lg border px-2.5 py-2 text-center font-medium',
+                      'rounded-lg border px-2.5 py-2 text-center font-medium transition',
                       url
-                        ? 'border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/30'
+                        ? 'border-primary-200 text-primary-700 hover:bg-primary-50 disabled:opacity-60 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/30'
                         : 'cursor-default border-gray-200 text-gray-400 dark:border-gray-700'
                     )}
                   >
-                    {label}: {url ? nombre || 'Ver archivo' : 'Sin archivo'}
-                  </a>
+                    {label}:{' '}
+                    {url
+                      ? legajoStreamLoadingTipo === tipo
+                        ? 'Abriendo…'
+                        : nombre || 'Ver archivo'
+                      : 'Sin archivo'}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1239,6 +1284,8 @@ export default function ColaboradorEmpleadoGestion() {
                   previewUrl={legajoPdfPreviewUrls.curriculum}
                   currentUrl={empleado?.curriculum_archivo_url}
                   disabled={savingPersona}
+                  verLoading={legajoStreamLoadingTipo === 'curriculum'}
+                  onVerServer={() => void openLegajoStream('curriculum', 'Curriculum')}
                   onChange={onPickLegajoPdf(setCurriculumFile)}
                 />
                 <LegajoPdfReplaceBlock
@@ -1247,6 +1294,8 @@ export default function ColaboradorEmpleadoGestion() {
                   previewUrl={legajoPdfPreviewUrls.licencia}
                   currentUrl={empleado?.licencia_conducir_archivo_url}
                   disabled={savingPersona}
+                  verLoading={legajoStreamLoadingTipo === 'licencia'}
+                  onVerServer={() => void openLegajoStream('licencia', 'Licencia de conducir')}
                   onChange={onPickLegajoPdf(setLicenciaFile)}
                 />
                 <LegajoPdfReplaceBlock
@@ -1255,6 +1304,8 @@ export default function ColaboradorEmpleadoGestion() {
                   previewUrl={legajoPdfPreviewUrls.aviso}
                   currentUrl={empleado?.aviso_luz_agua_archivo_url}
                   disabled={savingPersona}
+                  verLoading={legajoStreamLoadingTipo === 'aviso'}
+                  onVerServer={() => void openLegajoStream('aviso', 'Aviso luz / agua')}
                   onChange={onPickLegajoPdf(setAvisoFile)}
                 />
                 <LegajoPdfReplaceBlock
@@ -1263,6 +1314,8 @@ export default function ColaboradorEmpleadoGestion() {
                   previewUrl={legajoPdfPreviewUrls.croquis}
                   currentUrl={empleado?.croquis_archivo_url}
                   disabled={savingPersona}
+                  verLoading={legajoStreamLoadingTipo === 'croquis'}
+                  onVerServer={() => void openLegajoStream('croquis', 'Croquis')}
                   onChange={onPickLegajoPdf(setCroquisFile)}
                 />
                 <LegajoImagePdfReplaceBlock
@@ -1271,6 +1324,14 @@ export default function ColaboradorEmpleadoGestion() {
                   previewUrl={legajoPdfPreviewUrls.certNacimiento}
                   currentUrl={empleado?.certificado_nacimiento_archivo_url}
                   disabled={savingPersona}
+                  verLoading={legajoStreamLoadingTipo === 'certificado_nacimiento'}
+                  onVerServer={() =>
+                    void openLegajoStream(
+                      'certificado_nacimiento',
+                      'Certificado de nacimiento',
+                      empleado?.certificado_nacimiento_archivo_nombre
+                    )
+                  }
                   onChange={onPickLegajoPdf(setCertNacimientoFile, true)}
                 />
               </div>
@@ -1333,6 +1394,28 @@ export default function ColaboradorEmpleadoGestion() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(legajoViewer)}
+        onClose={closeLegajoViewer}
+        title={legajoViewer?.title || 'Documento'}
+        size="xl"
+        overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
+        className="animate-scale-in rounded-2xl motion-reduce:animate-none"
+        bodyClassName="p-0 sm:p-0"
+      >
+        {legajoViewer?.kind === 'pdf' ? (
+          <iframe
+            title={legajoViewer.title}
+            src={legajoViewer.url}
+            className="h-[min(75vh,640px)] w-full rounded-b-lg border-0 bg-gray-100 dark:bg-gray-900"
+          />
+        ) : legajoViewer?.kind === 'image' ? (
+          <div className="flex max-h-[75vh] justify-center overflow-auto bg-gray-100 p-4 dark:bg-gray-900">
+            <img src={legajoViewer.url} alt="" className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : null}
       </Modal>
     </div>
     </ColaboradorShell>

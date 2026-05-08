@@ -122,6 +122,63 @@ export const consultoraService = {
     }
   },
 
+  async descargarPlantillaRegistroMasivoColaboradores() {
+    try {
+      const response = await api.get('/consultora/colaboradores/plantilla-registro-masivo', {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+
+      const cd = response.headers['content-disposition'] || ''
+      let filename = 'plantilla_registro_masivo_colaboradores.xlsx'
+      const m = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+      if (m?.[1]) {
+        try {
+          filename = decodeURIComponent(m[1].replace(/"/g, '').trim()) || filename
+        } catch {
+          filename = m[1].replace(/"/g, '').trim() || filename
+        }
+      }
+
+      const downloadUrl = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]))
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      return { success: true }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async cargarRegistroMasivoColaboradores(file) {
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const response = await api.post('/consultora/colaboradores/registro-masivo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
+    }
+  },
+
   async patchColaboradorAcceso(colaboradorId, payload) {
     try {
       const response = await patch(`/consultora/colaboradores/${colaboradorId}/acceso`, payload)

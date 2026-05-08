@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  Download,
+  FileUp,
   Mail,
   Phone,
   Shield,
@@ -134,6 +136,11 @@ export default function ConsultoraMiEquipo() {
   const [msg, setMsg] = useState(null)
   const [toggleBusyId, setToggleBusyId] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [plantillaModalOpen, setPlantillaModalOpen] = useState(false)
+  const [downloadingPlantilla, setDownloadingPlantilla] = useState(false)
+  const [uploadingPlantilla, setUploadingPlantilla] = useState(false)
+  const [archivoMasivo, setArchivoMasivo] = useState(null)
+  const [resumenMasivo, setResumenMasivo] = useState(null)
   const [permModalOpen, setPermModalOpen] = useState(false)
   const [permRow, setPermRow] = useState(null)
   const [permDraft, setPermDraft] = useState(() => buildPermDraft({ permisos_por_modulo: [] }))
@@ -217,6 +224,42 @@ export default function ConsultoraMiEquipo() {
   const closeModal = () => {
     setModalOpen(false)
     reset()
+  }
+
+  const descargarPlantilla = async () => {
+    setDownloadingPlantilla(true)
+    const res = await consultoraService.descargarPlantillaRegistroMasivoColaboradores()
+    setDownloadingPlantilla(false)
+    if (res.success) {
+      setPlantillaModalOpen(false)
+      setMsg('Plantilla descargada. Complétala en Excel y úsala para registro masivo.')
+    } else {
+      setMsg(res.message || 'No se pudo descargar la plantilla.')
+    }
+  }
+
+  const subirPlantillaMasiva = async () => {
+    if (!archivoMasivo) {
+      setMsg('Selecciona un archivo .xlsx, .xls o .csv para cargar.')
+      return
+    }
+    setUploadingPlantilla(true)
+    setResumenMasivo(null)
+    const res = await consultoraService.cargarRegistroMasivoColaboradores(archivoMasivo)
+    setUploadingPlantilla(false)
+    if (res.success) {
+      await load()
+      const data = res.data || {}
+      setResumenMasivo({
+        creados: Number(data.creados) || 0,
+        procesados: Number(data.procesados) || 0,
+        errores: Array.isArray(data.errores) ? data.errores : [],
+      })
+      setMsg(res.message || 'Carga masiva completada.')
+      setArchivoMasivo(null)
+    } else {
+      setMsg(res.message || 'No se pudo procesar la plantilla.')
+    }
   }
 
   const onCreate = async (data) => {
@@ -323,17 +366,29 @@ export default function ConsultoraMiEquipo() {
             legajos, registrar personal o la ficha de la empresa cliente.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => {
-            setMsg(null)
-            setModalOpen(true)
-          }}
-          icon={<UserPlus className="h-4 w-4" />}
-          className="shrink-0"
-        >
-          Nuevo colaborador
-        </Button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setMsg(null)
+              setPlantillaModalOpen(true)
+            }}
+            icon={<Download className="h-4 w-4" />}
+          >
+            Plantilla registro masivo
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setMsg(null)
+              setModalOpen(true)
+            }}
+            icon={<UserPlus className="h-4 w-4" />}
+          >
+            Nuevo colaborador
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -600,6 +655,88 @@ export default function ConsultoraMiEquipo() {
           </>
         )}
       </Card>
+
+      <Modal
+        isOpen={plantillaModalOpen}
+        onClose={() => setPlantillaModalOpen(false)}
+        title="Plantilla Excel para registro masivo"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Descarga la plantilla en Excel con columnas en español. En la columna <strong>CARGO</strong>{' '}
+            podrás seleccionar valores desde un desplegable.
+          </p>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Columnas incluidas</p>
+            <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+              NOMBRES, APELLIDOS, CI, TELEFONO, CORREO, CARGO, FECHA_INGRESO(YYYY-MM-DD),
+              CONTRASENA_INICIAL, ACCESO_HABILITADO(1/0)
+            </p>
+          </div>
+          <ul className="list-disc space-y-1 pl-5 text-xs text-gray-600 dark:text-gray-400">
+            <li>
+              Cargos válidos: <code>coordinador_general</code>, <code>analista_afp</code>, <code>analista_caja</code>, <code>analista_ministerio</code>, <code>asistente</code>.
+            </li>
+            <li>
+              <code>ACCESO_HABILITADO</code>: usa <code>1</code> para activo o <code>0</code> para bloqueado.
+            </li>
+            <li>
+              La contraseña inicial debe tener al menos 8 caracteres.
+            </li>
+          </ul>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/30">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Cargar plantilla completada</p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => setArchivoMasivo(e.target.files?.[0] || null)}
+                className="input w-full text-sm"
+              />
+              <Button
+                type="button"
+                onClick={() => void subirPlantillaMasiva()}
+                loading={uploadingPlantilla}
+                icon={<FileUp className="h-4 w-4" />}
+                className="sm:shrink-0"
+              >
+                Cargar masivo
+              </Button>
+            </div>
+            {archivoMasivo ? (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Archivo seleccionado: {archivoMasivo.name}</p>
+            ) : null}
+          </div>
+          {resumenMasivo ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm dark:border-primary-800 dark:bg-primary-900/20">
+              <p className="font-semibold text-primary-900 dark:text-primary-100">
+                Resultado: {resumenMasivo.creados} creados de {resumenMasivo.procesados} procesados.
+              </p>
+              {resumenMasivo.errores.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-primary-900 dark:text-primary-100">
+                  {resumenMasivo.errores.slice(0, 8).map((e, i) => (
+                    <li key={`${e.fila}-${i}`}>Fila {e.fila}: {e.mensaje}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setPlantillaModalOpen(false)}>
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void descargarPlantilla()}
+              loading={downloadingPlantilla}
+              icon={<Download className="h-4 w-4" />}
+            >
+              Descargar plantilla
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={modalOpen}

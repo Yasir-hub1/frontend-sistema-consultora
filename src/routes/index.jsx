@@ -34,6 +34,7 @@ import EmpresaClienteDashboard from '../pages/empresa-cliente/Dashboard'
 import EmpresaClientePersonal from '../pages/empresa-cliente/Personal'
 import EmpresaClienteEmpleado from '../pages/empresa-cliente/EmpleadoVista'
 import EmpresaClienteMiConsultora from '../pages/empresa-cliente/MiConsultora'
+import EmpresaClienteMiEmpresa from '../pages/empresa-cliente/MiEmpresa'
 import EmpresaClienteDeclaraciones from '../pages/empresa-cliente/DeclaracionesMensuales'
 
 function postLoginHome(user) {
@@ -141,6 +142,7 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="/empresa-cliente/dashboard" replace />} />
         <Route path="dashboard" element={<EmpresaClienteDashboard />} />
         <Route path="declaraciones-mensuales" element={<EmpresaClienteDeclaraciones />} />
+        <Route path="mi-empresa" element={<EmpresaClienteMiEmpresa />} />
         <Route path="personal" element={<EmpresaClientePersonal />} />
         <Route path="personal/:personalId" element={<EmpresaClienteEmpleado />} />
         <Route path="mi-consultora" element={<EmpresaClienteMiConsultora />} />

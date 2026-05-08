@@ -14,6 +14,16 @@ function stripEmpty(params) {
 }
 
 export const empresaClienteService = {
+  DOCUMENTOS_MI_EMPRESA: [
+    { key: 'nit', label: 'NIT' },
+    { key: 'roe', label: 'ROE' },
+    { key: 'matricula_comercio', label: 'MATRICULA DE COMERCIO' },
+    { key: 'licencia_funcionamiento', label: 'LICENCIA DE FUNCIONAMIENTO' },
+    { key: 'certificado_patronal_caja', label: 'CERTIFICADO PARTERNAL DE LA CAJA' },
+    { key: 'formulario_inscripcion_gestora', label: 'FORMULARIO DE INSCRIPCION DE GESTORA' },
+    { key: 'certificacion_nit', label: 'CERTIFICACION DE NIT' },
+  ],
+
   async getDashboard() {
     try {
       const response = await get('/empresa-cliente/dashboard')
@@ -311,5 +321,87 @@ export const empresaClienteService = {
         message: error.message || error.response?.data?.message || MESSAGES.ERROR_FETCH,
       }
     }
+  },
+
+  async listMiEmpresaDocumentos() {
+    try {
+      const response = await get('/empresa-cliente/mi-empresa/documentos')
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async uploadMiEmpresaDocumento(tipoDocumento, file) {
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const response = await api.post(`/empresa-cliente/mi-empresa/documentos/${tipoDocumento}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return {
+        success: Boolean(response.data?.success),
+        data: response.data?.data,
+        message: response.data?.message || (response.data?.success ? 'Documento cargado.' : MESSAGES.ERROR_FETCH),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async fetchMiEmpresaDocumentoVistaPreviaBlob(tipoDocumento) {
+    try {
+      const response = await api.get(`/empresa-cliente/mi-empresa/documentos/${tipoDocumento}/vista-previa`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      const cd = response.headers['content-disposition'] || ''
+      const m = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(cd)
+      const nombre = m ? decodeURIComponent(m[1]) : `${tipoDocumento}.pdf`
+      const contentType =
+        (blob instanceof Blob && blob.type && blob.type !== 'application/octet-stream'
+          ? blob.type
+          : null) ||
+        response.headers['content-type'] ||
+        'application/octet-stream'
+      return { success: true, blob, nombreOriginal: nombre, contentType }
+    } catch (error) {
+      const d = error.response?.data
+      if (d instanceof Blob) {
+        try {
+          const j = JSON.parse(await d.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* noop */
+        }
+      }
+      return {
+        success: false,
+        message: error.message || error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async descargarMiEmpresaDocumento(tipoDocumento, nombreOriginal) {
+    await download(
+      `/empresa-cliente/mi-empresa/documentos/${tipoDocumento}/descargar`,
+      {},
+      nombreOriginal || `${tipoDocumento}.pdf`
+    )
   },
 }

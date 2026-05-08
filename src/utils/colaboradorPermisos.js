@@ -69,3 +69,15 @@ export function colaboradorPuedeEditarEmpresaCliente(user) {
   if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
   return Boolean(user.colaborador?.puede_editar_empresa_cliente)
 }
+
+/** PDFs varios en el directorio de personal (empresa asignada) */
+export function colaboradorPuedeGestionarOtrosDocumentosEmpresa(user) {
+  if (!user) return false
+  if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
+  if (colaboradorPuedeRegistrarPersonal(user)) return true
+  if (colaboradorPuedeEditarLegajoGlobal(user)) return true
+  for (const m of ['afp', 'caja', 'ministerio']) {
+    if (colaboradorPuedeSubirDocumentosEnModulo(user, m)) return true
+  }
+  return false
+}

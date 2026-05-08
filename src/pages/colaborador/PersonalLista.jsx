@@ -14,6 +14,7 @@ import {
   Eye,
   FileSpreadsheet,
   FileText,
+  FileUp,
   Hash,
   CreditCard,
   Landmark,
@@ -41,6 +42,7 @@ import {
   colaboradorPuedeCargarAlgunaDeclaracionMensual,
   colaboradorPuedeCargarDeclaracionAguinaldo,
   colaboradorPuedeCargarDeclaracionMensualEnModulo,
+  colaboradorPuedeGestionarOtrosDocumentosEmpresa,
   colaboradorPuedeRegistrarPersonal,
 } from '../../utils/colaboradorPermisos'
 import { clsx } from 'clsx'
@@ -270,6 +272,7 @@ export default function ColaboradorPersonalLista() {
   const { user } = useAuth()
   const { empresaId } = useParams()
   const canRegistrarPersonal = colaboradorPuedeRegistrarPersonal(user)
+  const canGestionarOtrosDocumentos = colaboradorPuedeGestionarOtrosDocumentosEmpresa(user)
   const canSubirDeclaracionMensual = colaboradorPuedeCargarAlgunaDeclaracionMensual(user)
   const canSubirDeclaracionAguinaldo = colaboradorPuedeCargarDeclaracionAguinaldo(user)
   const [rows, setRows] = useState([])
@@ -278,6 +281,11 @@ export default function ColaboradorPersonalLista() {
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [masivoModalOpen, setMasivoModalOpen] = useState(false)
+  const [downloadingPlantilla, setDownloadingPlantilla] = useState(false)
+  const [uploadingPlantilla, setUploadingPlantilla] = useState(false)
+  const [archivoMasivo, setArchivoMasivo] = useState(null)
+  const [resumenMasivo, setResumenMasivo] = useState(null)
   const [contactosReferencia, setContactosReferencia] = useState(['', ''])
   const [curriculumFile, setCurriculumFile] = useState(null)
   const [licenciaFile, setLicenciaFile] = useState(null)
@@ -303,6 +311,7 @@ export default function ColaboradorPersonalLista() {
   declRowsRef.current = declRows
   const [preview, setPreview] = useState(null)
   const [previewLoadingId, setPreviewLoadingId] = useState(null)
+  const [registroLegajoPreview, setRegistroLegajoPreview] = useState(null)
 
   const [aguiModalOpen, setAguiModalOpen] = useState(false)
   const [aguiRows, setAguiRows] = useState([])
@@ -311,6 +320,14 @@ export default function ColaboradorPersonalLista() {
   const [aguiUploading, setAguiUploading] = useState(false)
   const aguiFileRef = useRef(null)
   const [aguiPreviewLoadingId, setAguiPreviewLoadingId] = useState(null)
+
+  const [otrosDocsModalOpen, setOtrosDocsModalOpen] = useState(false)
+  const [otrosDocsRows, setOtrosDocsRows] = useState([])
+  const [otrosDocsLoading, setOtrosDocsLoading] = useState(false)
+  const [otrosDocFile, setOtrosDocFile] = useState(null)
+  const [otrosDocDescripcion, setOtrosDocDescripcion] = useState('')
+  const [otrosDocUploading, setOtrosDocUploading] = useState(false)
+  const [otrosDocPreviewLoadingId, setOtrosDocPreviewLoadingId] = useState(null)
 
   const closeDeclModal = () => {
     setDeclModalOpen(false)
@@ -572,6 +589,72 @@ export default function ColaboradorPersonalLista() {
     }
   }
 
+  useEffect(() => {
+    if (!otrosDocsModalOpen) return
+    let c = false
+    ;(async () => {
+      setOtrosDocsLoading(true)
+      const res = await colaboradorService.listOtrosDocumentosEmpresa(empresaId)
+      if (!c && res.success) setOtrosDocsRows(res.data?.items ?? [])
+      if (!c) setOtrosDocsLoading(false)
+    })()
+    return () => {
+      c = true
+    }
+  }, [otrosDocsModalOpen, empresaId])
+
+  const closeOtrosDocsModal = () => {
+    setOtrosDocsModalOpen(false)
+    setOtrosDocFile(null)
+    setOtrosDocDescripcion('')
+  }
+
+  const onSubirOtroDocumento = async () => {
+    if (!otrosDocFile) {
+      toast.error('Selecciona un PDF.')
+      return
+    }
+    if (!isPdfFile(otrosDocFile)) {
+      toast.error('Solo se permiten archivos PDF.')
+      return
+    }
+    setOtrosDocUploading(true)
+    const res = await colaboradorService.subirOtroDocumentoEmpresa(empresaId, otrosDocFile, otrosDocDescripcion)
+    setOtrosDocUploading(false)
+    if (res.success) {
+      toast.success('Documento guardado.')
+      setOtrosDocFile(null)
+      setOtrosDocDescripcion('')
+      const list = await colaboradorService.listOtrosDocumentosEmpresa(empresaId)
+      if (list.success) setOtrosDocsRows(list.data?.items ?? [])
+    } else {
+      toast.error(res.message || 'No se pudo guardar.')
+    }
+  }
+
+  const onPreviewOtroDocumento = async (row) => {
+    setOtrosDocPreviewLoadingId(row.id)
+    const res = await colaboradorService.fetchOtroDocumentoEmpresaVistaPreviaBlob(empresaId, row.id)
+    setOtrosDocPreviewLoadingId(null)
+    if (!res.success || !res.blob?.size) {
+      toast.error(res.message || 'No se pudo mostrar la vista previa.')
+      return
+    }
+    setPreview((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url)
+      const url = URL.createObjectURL(res.blob)
+      return { url, kind: 'pdf', title: row.nombre_original }
+    })
+  }
+
+  const onDownloadOtroDocumento = async (row) => {
+    try {
+      await colaboradorService.descargarOtroDocumentoEmpresa(empresaId, row.id, row.nombre_original)
+    } catch {
+      toast.error('No se pudo descargar.')
+    }
+  }
+
   const declHistorialPorMes = agruparDeclaracionesPorMes(declRows)
 
   useEffect(() => {
@@ -635,6 +718,22 @@ export default function ColaboradorPersonalLista() {
     },
   })
 
+  const openRegistroLegajoPreview = (file, title) => {
+    setRegistroLegajoPreview((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url)
+      if (!file) return null
+      const kind = isPdfFile(file) ? 'pdf' : 'image'
+      return { url: URL.createObjectURL(file), kind, title: title || file.name }
+    })
+  }
+
+  const closeRegistroLegajoPreview = () => {
+    setRegistroLegajoPreview((p) => {
+      if (p?.url) URL.revokeObjectURL(p.url)
+      return null
+    })
+  }
+
   const closeModal = () => {
     setModalOpen(false)
     reset()
@@ -644,6 +743,42 @@ export default function ColaboradorPersonalLista() {
     setAvisoFile(null)
     setCroquisFile(null)
     setCertNacimientoFile(null)
+    closeRegistroLegajoPreview()
+  }
+
+  const descargarPlantillaMasiva = async () => {
+    setDownloadingPlantilla(true)
+    const res = await colaboradorService.descargarPlantillaPersonalMasivo(empresaId)
+    setDownloadingPlantilla(false)
+    if (res.success) {
+      setMsg('Plantilla descargada. Los documentos del legajo puedes subirlos después desde el detalle del empleado.')
+    } else {
+      setMsg(res.message || 'No se pudo descargar la plantilla.')
+    }
+  }
+
+  const subirPlantillaMasiva = async () => {
+    if (!archivoMasivo) {
+      setMsg('Selecciona un archivo .xlsx, .xls o .csv.')
+      return
+    }
+    setUploadingPlantilla(true)
+    setResumenMasivo(null)
+    const res = await colaboradorService.cargarPersonalMasivo(empresaId, archivoMasivo)
+    setUploadingPlantilla(false)
+    if (res.success) {
+      await load()
+      const data = res.data || {}
+      setResumenMasivo({
+        creados: Number(data.creados) || 0,
+        procesados: Number(data.procesados) || 0,
+        errores: Array.isArray(data.errores) ? data.errores : [],
+      })
+      setMsg(res.message || 'Carga masiva completada.')
+      setArchivoMasivo(null)
+    } else {
+      setMsg(res.message || 'No se pudo procesar la plantilla.')
+    }
   }
 
   const onCreate = async (data) => {
@@ -651,10 +786,6 @@ export default function ColaboradorPersonalLista() {
     const contactos = contactosReferencia.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3)
     if (contactos.length < 2) {
       setMsg('Debes registrar al menos 2 datos de contacto.')
-      return
-    }
-    if (!curriculumFile || !avisoFile || !croquisFile || !certNacimientoFile) {
-      setMsg('Curriculum, aviso de luz/agua, croquis y certificado de nacimiento son obligatorios.')
       return
     }
     const legajoPdfFiles = [curriculumFile, avisoFile, croquisFile, licenciaFile].filter(Boolean)
@@ -685,7 +816,9 @@ export default function ColaboradorPersonalLista() {
     if (res.success) {
       closeModal()
       await load()
-      setMsg('Personal registrado. Ya puedes cargar documentos en AFP, CAJA y Ministerio.')
+      setMsg(
+        'Personal registrado. Podés completar curriculum, avisos y demás documentos del legajo cuando los tengas; también en AFP, CAJA y Ministerio.'
+      )
     } else setMsg(res.message)
   }
 
@@ -737,17 +870,33 @@ export default function ColaboradorPersonalLista() {
           </div>
         </div>
         {canRegistrarPersonal ? (
-          <Button
-            type="button"
-            onClick={() => {
-              setMsg(null)
-              setModalOpen(true)
-            }}
-            icon={<UserPlus className="h-4 w-4" />}
-            className="w-full shrink-0 sm:w-auto"
-          >
-            Registrar personal
-          </Button>
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setMsg(null)
+                setResumenMasivo(null)
+                setArchivoMasivo(null)
+                setMasivoModalOpen(true)
+              }}
+              icon={<Download className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Registro masivo
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setMsg(null)
+                setModalOpen(true)
+              }}
+              icon={<UserPlus className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Registrar personal
+            </Button>
+          </div>
         ) : (
           <p className="max-w-sm text-xs text-amber-800 dark:text-amber-200/90">
             No tienes permiso para registrar personal. Pide a la consultora que lo habilite en Mi equipo →
@@ -840,6 +989,18 @@ export default function ColaboradorPersonalLista() {
                 >
                   Declaración anual de aguinaldo
                 </Button>
+                {canGestionarOtrosDocumentos ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    icon={<FileText className="h-4 w-4" />}
+                    onClick={() => setOtrosDocsModalOpen(true)}
+                  >
+                    Otros documentos (PDF)
+                  </Button>
+                ) : null}
               </>
             ) : null}
             <label htmlFor="colab-per-page" className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
@@ -1002,6 +1163,134 @@ export default function ColaboradorPersonalLista() {
           </>
         )}
       </Card>
+
+      <Modal
+        isOpen={otrosDocsModalOpen}
+        onClose={closeOtrosDocsModal}
+        title="Otros documentos de la empresa"
+        size="lg"
+        overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
+        className="animate-scale-in rounded-2xl motion-reduce:animate-none"
+        bodyClassName="p-4 sm:p-6 max-h-[85vh] overflow-y-auto"
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Subí PDFs generales de esta empresa cliente (no están ligados a un empleado concreto). La descripción es
+          opcional y ayuda a identificar el archivo. Podés ver y descargar cada documento como en el resto del portal.
+        </p>
+        {canGestionarOtrosDocumentos ? (
+          <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+            <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-400">Archivo PDF</label>
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null
+                if (f && !isPdfFile(f)) {
+                  toast.error('Solo se permiten archivos PDF.')
+                  e.target.value = ''
+                  setOtrosDocFile(null)
+                  return
+                }
+                setOtrosDocFile(f)
+              }}
+              className="input w-full py-2.5 text-sm"
+            />
+            <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Descripción (opcional)
+            </label>
+            <textarea
+              value={otrosDocDescripcion}
+              onChange={(e) => setOtrosDocDescripcion(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Ej. Convenio marco 2024, comunicado interno…"
+              className="input min-h-[5rem] w-full resize-y py-2.5 text-sm"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => void onSubirOtroDocumento()}
+                loading={otrosDocUploading}
+                disabled={!otrosDocFile}
+                icon={<Upload className="h-4 w-4" />}
+              >
+                Subir documento
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">
+            No tienes permiso para subir en esta sección.
+          </p>
+        )}
+        <div className="mt-6">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Documentos cargados
+          </p>
+          {otrosDocsLoading ? (
+            <p className="py-8 text-center text-sm text-gray-500">Cargando…</p>
+          ) : otrosDocsRows.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-700">
+              Aún no hay documentos en esta lista.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800/90">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Archivo</th>
+                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Descripción</th>
+                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Tamaño</th>
+                    <th className="px-3 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-200">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900/30">
+                  {otrosDocsRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="max-w-[12rem] px-3 py-2.5">
+                        <span className="font-medium text-gray-900 dark:text-white">{row.nombre_original}</span>
+                      </td>
+                      <td className="max-w-[14rem] px-3 py-2.5 text-gray-600 dark:text-gray-300">
+                        {row.descripcion ? (
+                          <span className="line-clamp-2 text-sm">{row.descripcion}</span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-gray-600 dark:text-gray-400">
+                        {formatBytes(row.tamano_bytes)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                        <div className="inline-flex flex-wrap justify-end gap-1">
+                          <button
+                            type="button"
+                            title="Vista previa"
+                            disabled={otrosDocPreviewLoadingId === row.id}
+                            onClick={() => void onPreviewOtroDocumento(row)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </button>
+                          <button
+                            type="button"
+                            title="Descargar"
+                            onClick={() => void onDownloadOtroDocumento(row)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-primary-200 px-2.5 py-1.5 text-xs font-semibold text-primary-800 transition hover:bg-primary-50 dark:border-primary-800 dark:text-primary-200 dark:hover:bg-primary-950/40"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Descargar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         isOpen={declModalOpen}
@@ -1536,6 +1825,105 @@ export default function ColaboradorPersonalLista() {
       </Modal>
 
       <Modal
+        isOpen={Boolean(registroLegajoPreview)}
+        onClose={closeRegistroLegajoPreview}
+        title={registroLegajoPreview?.title || 'Vista previa'}
+        size="xl"
+        overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
+        className="animate-scale-in rounded-2xl motion-reduce:animate-none"
+        bodyClassName="p-0 sm:p-0"
+      >
+        {registroLegajoPreview?.kind === 'pdf' ? (
+          <iframe
+            title={registroLegajoPreview.title}
+            src={registroLegajoPreview.url}
+            className="h-[min(75vh,640px)] w-full rounded-b-lg border-0 bg-gray-100 dark:bg-gray-900"
+          />
+        ) : registroLegajoPreview?.kind === 'image' ? (
+          <div className="flex max-h-[75vh] justify-center overflow-auto bg-gray-100 p-4 dark:bg-gray-900">
+            <img src={registroLegajoPreview.url} alt="" className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={masivoModalOpen}
+        onClose={() => setMasivoModalOpen(false)}
+        title="Registro masivo de personal"
+        size="lg"
+        overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
+        className="animate-scale-in rounded-2xl motion-reduce:animate-none"
+        bodyClassName="p-4 sm:p-6"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Descargá la plantilla Excel, completá una fila por empleado y subila aquí. Los PDF del legajo son opcionales;
+            podés adjuntarlos después en el detalle de cada persona.
+          </p>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Columnas</p>
+            <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+              NOMBRES, APELLIDOS, CI, FECHA_NACIMIENTO(YYYY-MM-DD) opcional, FECHA_INGRESO(YYYY-MM-DD), CARGO opcional,
+              CORREO_ELECTRONICO opcional, CUENTA_BANCARIA opcional, CONTACTO_REFERENCIA_1, CONTACTO_REFERENCIA_2,
+              CONTACTO_REFERENCIA_3 opcional (mínimo 2 contactos con datos entre las tres columnas).
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/30">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Subir plantilla completada</p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => setArchivoMasivo(e.target.files?.[0] || null)}
+                className="input w-full text-sm"
+              />
+              <Button
+                type="button"
+                onClick={() => void subirPlantillaMasiva()}
+                loading={uploadingPlantilla}
+                icon={<FileUp className="h-4 w-4" />}
+                className="sm:shrink-0"
+              >
+                Cargar masivo
+              </Button>
+            </div>
+            {archivoMasivo ? (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Archivo: {archivoMasivo.name}</p>
+            ) : null}
+          </div>
+          {resumenMasivo ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm dark:border-primary-800 dark:bg-primary-900/20">
+              <p className="font-semibold text-primary-900 dark:text-primary-100">
+                Resultado: {resumenMasivo.creados} creados de {resumenMasivo.procesados} procesados.
+              </p>
+              {resumenMasivo.errores.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-primary-900 dark:text-primary-100">
+                  {resumenMasivo.errores.slice(0, 10).map((e, i) => (
+                    <li key={`${e.fila}-${i}`}>
+                      Fila {e.fila}: {e.mensaje}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-gray-700 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setMasivoModalOpen(false)}>
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void descargarPlantillaMasiva()}
+              loading={downloadingPlantilla}
+              icon={<Download className="h-4 w-4" />}
+            >
+              Descargar plantilla
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={modalOpen}
         onClose={closeModal}
         title="Registrar personal"
@@ -1546,7 +1934,8 @@ export default function ColaboradorPersonalLista() {
       >
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Registra el legajo base con los nuevos requisitos documentales. La licencia de conducir es opcional.
+            Registrá el legajo base. Curriculum, avisos, croquis y certificado de nacimiento son opcionales; podés
+            subirlos ahora o después desde el detalle del empleado. La licencia de conducir sigue siendo opcional.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nombres" {...register('nombres', { required: 'Obligatorio' })} />
@@ -1597,62 +1986,128 @@ export default function ColaboradorPersonalLista() {
             <div className="sm:col-span-2 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Curriculum (PDF) *
+                  Curriculum (PDF, opcional)
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={pickPdfOnly(setCurriculumFile)}
-                  className="input w-full py-2.5"
-                  required
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={pickPdfOnly(setCurriculumFile)}
+                    className="input min-w-0 flex-1 py-2.5"
+                  />
+                  {curriculumFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto sm:shrink-0"
+                      icon={<Eye className="h-4 w-4" />}
+                      onClick={() => openRegistroLegajoPreview(curriculumFile, 'Curriculum')}
+                    >
+                      Ver
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Licencia de conducir (opcional, PDF)
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={pickPdfOnly(setLicenciaFile)}
-                  className="input w-full py-2.5"
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={pickPdfOnly(setLicenciaFile)}
+                    className="input min-w-0 flex-1 py-2.5"
+                  />
+                  {licenciaFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto sm:shrink-0"
+                      icon={<Eye className="h-4 w-4" />}
+                      onClick={() => openRegistroLegajoPreview(licenciaFile, 'Licencia de conducir')}
+                    >
+                      Ver
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Avisos de luz/agua (PDF) *
+                  Avisos de luz/agua (PDF, opcional)
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={pickPdfOnly(setAvisoFile)}
-                  className="input w-full py-2.5"
-                  required
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={pickPdfOnly(setAvisoFile)}
+                    className="input min-w-0 flex-1 py-2.5"
+                  />
+                  {avisoFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto sm:shrink-0"
+                      icon={<Eye className="h-4 w-4" />}
+                      onClick={() => openRegistroLegajoPreview(avisoFile, 'Aviso luz/agua')}
+                    >
+                      Ver
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Croquis (PDF) *
+                  Croquis (PDF, opcional)
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={pickPdfOnly(setCroquisFile)}
-                  className="input w-full py-2.5"
-                  required
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={pickPdfOnly(setCroquisFile)}
+                    className="input min-w-0 flex-1 py-2.5"
+                  />
+                  {croquisFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto sm:shrink-0"
+                      icon={<Eye className="h-4 w-4" />}
+                      onClick={() => openRegistroLegajoPreview(croquisFile, 'Croquis')}
+                    >
+                      Ver
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Certificado de nacimiento (imagen o PDF) *
+                  Certificado de nacimiento (imagen o PDF, opcional)
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
-                  onChange={pickImageOrPdf(setCertNacimientoFile)}
-                  className="input w-full py-2.5"
-                  required
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+                    onChange={pickImageOrPdf(setCertNacimientoFile)}
+                    className="input min-w-0 flex-1 py-2.5"
+                  />
+                  {certNacimientoFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="sm:w-auto sm:shrink-0"
+                      icon={<Eye className="h-4 w-4" />}
+                      onClick={() => openRegistroLegajoPreview(certNacimientoFile, 'Certificado de nacimiento')}
+                    >
+                      Ver
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

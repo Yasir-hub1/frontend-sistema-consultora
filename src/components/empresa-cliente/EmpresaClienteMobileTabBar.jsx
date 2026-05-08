@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Building2, FileSpreadsheet, Home, Users } from 'lucide-react'
+import { Briefcase, Building2, FileSpreadsheet, Home, Users } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -11,6 +11,7 @@ const TABS = [
     end: false,
     icon: FileSpreadsheet,
   },
+  { to: '/empresa-cliente/mi-empresa', label: 'Empresa', end: false, icon: Briefcase },
   { to: '/empresa-cliente/mi-consultora', label: 'Consultora', end: false, icon: Building2 },
 ]
 
