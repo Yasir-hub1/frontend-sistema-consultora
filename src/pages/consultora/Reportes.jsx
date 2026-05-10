@@ -16,9 +16,17 @@ function formatBytes(n) {
 }
 
 function rowTipo(r) {
-  if (r?.tipo_declaracion) return String(r.tipo_declaracion)
+  const t = r?.tipo_declaracion ? String(r.tipo_declaracion) : ''
+  if (t === 'otros_documentos') return 'otros_documentos'
+  if (t) return t
   if (String(r?.modulo || '').toLowerCase() === 'aguinaldo') return 'aguinaldo'
   return 'mensual'
+}
+
+function etiquetaModuloReporte(r) {
+  const mod = String(r?.modulo || '').toLowerCase()
+  if (mod === 'otros_documentos') return 'Otros doc. empresa'
+  return String(r?.modulo || '—').toUpperCase()
 }
 
 export default function ConsultoraReportes() {
@@ -44,7 +52,8 @@ export default function ConsultoraReportes() {
   const load = async () => {
     setLoading(true)
     const res = await consultoraService.listReportesDeclaraciones({
-      mes_gestion: tipoDeclaracion === 'mensual' ? mesGestion : '',
+      mes_gestion:
+        tipoDeclaracion === 'mensual' || tipoDeclaracion === 'otros_documentos' ? mesGestion : '',
       anio: tipoDeclaracion === 'aguinaldo' ? anioGestion : '',
       modulo: tipoDeclaracion === 'mensual' ? modulo : '',
       tipo_declaracion: tipoDeclaracion,
@@ -249,8 +258,9 @@ export default function ConsultoraReportes() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reportes</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Filtra por mes y módulo (AFP, CAJA, Ministerio), previsualiza y exporta PDF consolidado. Genera la carta de
-          detalle de aportes por empresa y mes según las declaraciones registradas.
+          Filtra declaraciones por mes y módulo (AFP, CAJA, Ministerio), aguinaldo y los PDF de otros documentos por
+          empresa que cargan los colaboradores; previsualiza y exporta PDF consolidado solo de mensuales. La carta de
+          aportes usa las declaraciones registradas.
         </p>
       </div>
 
@@ -401,6 +411,7 @@ export default function ConsultoraReportes() {
             >
               <option value="mensual">Declaración mensual</option>
               <option value="aguinaldo">Declaración aguinaldo</option>
+              <option value="otros_documentos">Otros documentos (empresa)</option>
               <option value="todos">Todos</option>
             </select>
           </div>
@@ -421,7 +432,7 @@ export default function ConsultoraReportes() {
           </div>
           {tipoDeclaracion !== 'aguinaldo' ? (
             <Input
-              label="Mes gestión"
+              label={tipoDeclaracion === 'otros_documentos' ? 'Mes de subida' : 'Mes gestión'}
               type="month"
               value={mesGestion}
               onChange={(e) => setMesGestion(e.target.value)}
@@ -445,6 +456,14 @@ export default function ConsultoraReportes() {
                 <option value="caja">CAJA</option>
                 <option value="ministerio">Ministerio</option>
               </select>
+            </div>
+          ) : tipoDeclaracion === 'otros_documentos' ? (
+            <div className="space-y-2">
+              <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</span>
+              <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                Filtra por empresa y mes calendario en que se subió el PDF (misma sección que en personal del
+                colaborador).
+              </p>
             </div>
           ) : (
             <div />
@@ -500,8 +519,13 @@ export default function ConsultoraReportes() {
                   <tr key={`${r.tipo_declaracion || 'mensual'}-${r.id}`} className="bg-white dark:bg-gray-900/30">
                     <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.empresa_nombre || '—'}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.periodo_label || r.mes_gestion}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{String(r.modulo || '').toUpperCase()}</td>
-                    <td className="max-w-[14rem] truncate px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.nombre_original}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{etiquetaModuloReporte(r)}</td>
+                    <td className="max-w-[14rem] truncate px-3 py-2.5 text-gray-700 dark:text-gray-300">
+                      {r.nombre_original}
+                      {r.descripcion ? (
+                        <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{r.descripcion}</span>
+                      ) : null}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-gray-500 dark:text-gray-400">{formatBytes(r.tamano_bytes)}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
                       <div className="inline-flex gap-1">

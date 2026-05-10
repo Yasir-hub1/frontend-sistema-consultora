@@ -17,6 +17,7 @@ import {
   Settings,
   FileStack,
   FileSpreadsheet,
+  FileText,
   Files,
   Check,
 } from 'lucide-react'
@@ -126,6 +127,7 @@ const Layout = () => {
     { name: 'Inicio', href: '/empresa-cliente/dashboard', icon: Home },
     { name: 'Personal', href: '/empresa-cliente/personal', icon: Users },
     { name: 'Declaración mensual', href: '/empresa-cliente/declaraciones-mensuales', icon: FileSpreadsheet },
+    { name: 'Docs. colaborador', href: '/empresa-cliente/otros-documentos', icon: FileText },
     { name: 'Mi empresa', href: '/empresa-cliente/mi-empresa', icon: Files },
     { name: 'Mi consultora', href: '/empresa-cliente/mi-consultora', icon: Building2 },
   ]

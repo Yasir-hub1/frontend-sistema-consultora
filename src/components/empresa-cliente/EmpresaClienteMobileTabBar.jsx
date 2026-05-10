@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Briefcase, Building2, FileSpreadsheet, Home, Users } from 'lucide-react'
+import { Briefcase, Building2, FileSpreadsheet, FileText, Home, Users } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -11,6 +11,7 @@ const TABS = [
     end: false,
     icon: FileSpreadsheet,
   },
+  { to: '/empresa-cliente/otros-documentos', label: 'Colab.', end: false, icon: FileText },
   { to: '/empresa-cliente/mi-empresa', label: 'Empresa', end: false, icon: Briefcase },
   { to: '/empresa-cliente/mi-consultora', label: 'Consultora', end: false, icon: Building2 },
 ]
@@ -27,13 +28,13 @@ export default function EmpresaClienteMobileTabBar() {
       role="navigation"
       aria-label="Secciones del portal"
     >
-      <div className="mx-auto flex min-h-16 max-w-lg items-stretch justify-between gap-0 px-0.5">
+      <div className="mx-auto flex min-h-16 max-w-2xl items-stretch justify-start gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            className="flex min-h-[3.5rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-t-lg px-0.5 py-1.5 transition-colors active:bg-gray-100 dark:active:bg-gray-800/80"
+            className="flex min-h-[3.5rem] min-w-[4.25rem] shrink-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-t-lg px-0.5 py-1.5 transition-colors active:bg-gray-100 dark:active:bg-gray-800/80 sm:min-w-0 sm:flex-1"
           >
             {({ isActive }) => (
               <>

@@ -404,4 +404,71 @@ export const empresaClienteService = {
       nombreOriginal || `${tipoDocumento}.pdf`
     )
   },
+
+  /** PDFs que la consultora/colaborador sube en «otros documentos» de la empresa. */
+  async listOtrosDocumentosColaborador() {
+    try {
+      const response = await get('/empresa-cliente/otros-documentos')
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async fetchOtroDocumentoColaboradorVistaPreviaBlob(id) {
+    try {
+      const response = await api.get(`/empresa-cliente/otros-documentos/${id}/vista-previa`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        const text = await blob.text()
+        try {
+          const j = JSON.parse(text)
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return {
+        success: true,
+        blob,
+        contentType: response.headers['content-type'] || blob.type || 'application/pdf',
+      }
+    } catch (error) {
+      const d = error.response?.data
+      if (d instanceof Blob) {
+        try {
+          const j = JSON.parse(await d.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* noop */
+        }
+      }
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async descargarOtroDocumentoColaborador(id, nombreOriginal) {
+    await download(
+      `/empresa-cliente/otros-documentos/${id}/descargar`,
+      {},
+      nombreOriginal || `documento-${id}.pdf`
+    )
+  },
 }

@@ -36,6 +36,7 @@ import EmpresaClienteEmpleado from '../pages/empresa-cliente/EmpleadoVista'
 import EmpresaClienteMiConsultora from '../pages/empresa-cliente/MiConsultora'
 import EmpresaClienteMiEmpresa from '../pages/empresa-cliente/MiEmpresa'
 import EmpresaClienteDeclaraciones from '../pages/empresa-cliente/DeclaracionesMensuales'
+import EmpresaClienteOtrosDocumentos from '../pages/empresa-cliente/OtrosDocumentos'
 
 function postLoginHome(user) {
   const r = normalizeRole(user?.rol)
@@ -142,6 +143,7 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="/empresa-cliente/dashboard" replace />} />
         <Route path="dashboard" element={<EmpresaClienteDashboard />} />
         <Route path="declaraciones-mensuales" element={<EmpresaClienteDeclaraciones />} />
+        <Route path="otros-documentos" element={<EmpresaClienteOtrosDocumentos />} />
         <Route path="mi-empresa" element={<EmpresaClienteMiEmpresa />} />
         <Route path="personal" element={<EmpresaClientePersonal />} />
         <Route path="personal/:personalId" element={<EmpresaClienteEmpleado />} />
