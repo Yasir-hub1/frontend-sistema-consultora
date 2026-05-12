@@ -61,6 +61,115 @@ export const colaboradorService = {
     }
   },
 
+  async listMiEmpresaDocumentos(empresaClienteId) {
+    try {
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/mi-empresa/documentos`)
+      if (response.data.success) {
+        const raw = response.data.data
+        return {
+          success: true,
+          data: { items: raw?.items ?? [] },
+          message: response.data.message,
+        }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: { items: [] } }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
+        data: { items: [] },
+      }
+    }
+  },
+
+  async uploadMiEmpresaDocumento(empresaClienteId, tipoDocumento, file) {
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const response = await api.post(
+        `/colaborador/empresas-cliente/${empresaClienteId}/mi-empresa/documentos/${tipoDocumento}`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }
+      )
+      return {
+        success: Boolean(response.data?.success),
+        data: response.data?.data,
+        message: response.data?.message || (response.data?.success ? 'Documento cargado.' : MESSAGES.ERROR_FETCH),
+      }
+    } catch (error) {
+      const status = error.response?.status
+      const d = error.response?.data
+      let message = MESSAGES.ERROR_FETCH
+      if (typeof d === 'string' && d.trim()) {
+        message = d.length > 2000 ? `${d.slice(0, 2000)}…` : d
+      } else if (d && typeof d === 'object' && typeof d.message === 'string') {
+        message = d.message
+      } else if (error.message) {
+        message = error.message
+      }
+      const lower = String(message).toLowerCase()
+      if (
+        status === 413 ||
+        lower.includes('post data is too large') ||
+        lower.includes('posttoolarge') ||
+        (lower.includes('content-length') && lower.includes('exceeds'))
+      ) {
+        message =
+          'El archivo supera el límite de tamaño del servidor PHP (post_max_size / upload_max_filesize; el valor por defecto suele ser 8 MB). En desarrollo: php -d post_max_size=40M -d upload_max_filesize=32M artisan serve. En producción: subí esos valores en php.ini o en PHP-FPM (y client_max_body_size en Nginx si aplica).'
+      }
+      return {
+        success: false,
+        message,
+      }
+    }
+  },
+
+  async fetchMiEmpresaDocumentoVistaPreviaBlob(empresaClienteId, tipoDocumento) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/mi-empresa/documentos/${tipoDocumento}/vista-previa`,
+        {
+          responseType: 'blob',
+        }
+      )
+      const blob = response.data
+      const cd = response.headers['content-disposition'] || ''
+      const m = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(cd)
+      const nombre = m ? decodeURIComponent(m[1]) : `${tipoDocumento}.pdf`
+      const contentType =
+        (blob instanceof Blob && blob.type && blob.type !== 'application/octet-stream'
+          ? blob.type
+          : null) ||
+        response.headers['content-type'] ||
+        'application/octet-stream'
+      return { success: true, blob, nombreOriginal: nombre, contentType }
+    } catch (error) {
+      const d = error.response?.data
+      if (d instanceof Blob) {
+        try {
+          const j = JSON.parse(await d.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          /* noop */
+        }
+      }
+      return {
+        success: false,
+        message: error.message || error.response?.data?.message || MESSAGES.ERROR_FETCH,
+      }
+    }
+  },
+
+  async descargarMiEmpresaDocumento(empresaClienteId, tipoDocumento, nombreOriginal) {
+    await download(
+      `/colaborador/empresas-cliente/${empresaClienteId}/mi-empresa/documentos/${tipoDocumento}/descargar`,
+      {},
+      nombreOriginal || `${tipoDocumento}.pdf`
+    )
+  },
+
   async listTiposDocumentoModulo(modulo, params = {}) {
     try {
       const query = stripEmpty({

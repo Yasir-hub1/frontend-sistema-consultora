@@ -94,6 +94,7 @@ function buildPermDraft(row) {
   })
   return {
     puede_editar_empresa_cliente: normalizePermisoBool(row.puede_editar_empresa_cliente),
+    puede_declarar_aguinaldo: normalizePermisoBool(row.puede_declarar_aguinaldo),
     permisos,
   }
 }
@@ -316,12 +317,8 @@ export default function ConsultoraMiEquipo() {
     }))
   }
 
-  const patchDeclaracionAguinaldoGlobal = (valor) => {
-    // Aguinaldo (empresa) se habilita cuando puede declarar al menos un módulo.
-    setPermDraft((d) => ({
-      ...d,
-      permisos: d.permisos.map((p) => ({ ...p, puede_gestionar_modulo: Boolean(valor) })),
-    }))
+  const patchDeclaracionAguinaldo = (valor) => {
+    setPermDraft((d) => ({ ...d, puede_declarar_aguinaldo: Boolean(valor) }))
   }
 
   const guardarPermisos = async () => {
@@ -330,6 +327,7 @@ export default function ConsultoraMiEquipo() {
     setMsg(null)
     const res = await consultoraService.updateColaboradorPermisos(permRow.id, {
       puede_editar_empresa_cliente: normalizePermisoBool(permDraft.puede_editar_empresa_cliente),
+      puede_declarar_aguinaldo: normalizePermisoBool(permDraft.puede_declarar_aguinaldo),
       permisos: serializePermisosParaApi(permDraft.permisos),
     })
     setPermSaving(false)
@@ -853,7 +851,6 @@ export default function ConsultoraMiEquipo() {
             {(() => {
               const registrarGlobal = permDraft.permisos.some((p) => Boolean(p.puede_registrar_personal))
               const editarGlobal = permDraft.permisos.some((p) => Boolean(p.puede_editar_personal))
-              const aguinaldoGlobal = permDraft.permisos.some((p) => Boolean(p.puede_gestionar_modulo))
               return (
                 <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40">
                   <p className="text-sm font-bold text-gray-900 dark:text-white">Permisos globales del colaborador</p>
@@ -872,10 +869,10 @@ export default function ConsultoraMiEquipo() {
                         hint: 'Permite editar ficha del trabajador y régimen CAJA en todo el portal colaborador.',
                       },
                       {
-                        campo: 'puede_gestionar_modulo_global',
-                        checked: aguinaldoGlobal,
+                        campo: 'puede_declarar_aguinaldo',
+                        checked: permDraft.puede_declarar_aguinaldo,
                         label: 'Cargar declaración de aguinaldo (empresa)',
-                        hint: 'Habilita la carga anual de aguinaldo en Personal. Se aplica sobre módulos para mantener coherencia.',
+                        hint: 'Independiente de AFP/CAJA/Ministerio: solo habilita la carga anual del PDF de aguinaldo en Personal.',
                       },
                     ].map(({ campo, checked, label, hint }) => (
                       <label
@@ -887,8 +884,8 @@ export default function ConsultoraMiEquipo() {
                           className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                           checked={checked}
                           onChange={(e) => {
-                            if (campo === 'puede_gestionar_modulo_global') {
-                              patchDeclaracionAguinaldoGlobal(e.target.checked)
+                            if (campo === 'puede_declarar_aguinaldo') {
+                              patchDeclaracionAguinaldo(e.target.checked)
                             } else {
                               patchPermisoGlobal(campo, e.target.checked)
                             }

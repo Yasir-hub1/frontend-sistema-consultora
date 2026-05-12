@@ -1724,8 +1724,8 @@ export default function ColaboradorPersonalLista() {
           </div>
         ) : (
           <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">
-            Solo puedes consultar. Para subir el PDF de aguinaldo necesitas los mismos permisos que para declaraciones
-            (Mi equipo: editar/registrar legajo o subir/gestionar al menos un módulo).
+            Solo puedes consultar. Para subir el PDF de aguinaldo necesitas el permiso «Cargar declaración de aguinaldo
+            (empresa)» en Mi equipo, o bien «Editar legajo» / «Registrar personal».
           </p>
         )}
 

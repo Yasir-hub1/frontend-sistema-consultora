@@ -401,83 +401,83 @@ export default function ConsultoraReportes() {
       </Card>
 
       <Card title="Filtros" subtitle="Parametriza el reporte y ejecuta búsqueda" gradient>
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo</label>
-            <select
-              value={tipoDeclaracion}
-              onChange={(e) => setTipoDeclaracion(e.target.value)}
-              className="input w-full py-2.5"
-            >
-              <option value="mensual">Declaración mensual</option>
-              <option value="aguinaldo">Declaración aguinaldo</option>
-              <option value="otros_documentos">Otros documentos (empresa)</option>
-              <option value="todos">Todos</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Empresa cliente</label>
-            <select
-              value={empresaFiltroId}
-              onChange={(e) => setEmpresaFiltroId(e.target.value)}
-              className="input w-full py-2.5"
-            >
-              <option value="">Todas</option>
-              {empresasCliente.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre || e.razon_social || `Empresa #${e.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          {tipoDeclaracion !== 'aguinaldo' ? (
-            <Input
-              label={tipoDeclaracion === 'otros_documentos' ? 'Mes de subida' : 'Mes gestión'}
-              type="month"
-              value={mesGestion}
-              onChange={(e) => setMesGestion(e.target.value)}
-            />
-          ) : (
-            <Input
-              label="Año"
-              type="number"
-              min="2000"
-              max="2100"
-              value={anioGestion}
-              onChange={(e) => setAnioGestion(Number(e.target.value || new Date().getFullYear()))}
-            />
-          )}
-          {tipoDeclaracion === 'mensual' ? (
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</label>
-              <select value={modulo} onChange={(e) => setModulo(e.target.value)} className="input w-full py-2.5">
-                <option value="">Todos</option>
-                <option value="afp">AFP</option>
-                <option value="caja">CAJA</option>
-                <option value="ministerio">Ministerio</option>
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="min-w-0 space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo</label>
+              <select
+                value={tipoDeclaracion}
+                onChange={(e) => setTipoDeclaracion(e.target.value)}
+                className="input w-full min-w-0 py-2.5"
+              >
+                <option value="mensual">Declaración mensual</option>
+                <option value="aguinaldo">Declaración aguinaldo</option>
+                <option value="otros_documentos">Otros documentos (empresa)</option>
+                <option value="todos">Todos</option>
               </select>
             </div>
-          ) : tipoDeclaracion === 'otros_documentos' ? (
-            <div className="space-y-2">
-              <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</span>
-              <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-                Filtra por empresa y mes calendario en que se subió el PDF (misma sección que en personal del
-                colaborador).
-              </p>
+            <div className="min-w-0 space-y-2 sm:col-span-2 lg:col-span-1 xl:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Empresa cliente</label>
+              <select
+                value={empresaFiltroId}
+                onChange={(e) => setEmpresaFiltroId(e.target.value)}
+                className="input w-full min-w-0 max-w-full py-2.5"
+              >
+                <option value="">Todas</option>
+                {empresasCliente.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre || e.razon_social || `Empresa #${e.id}`}
+                  </option>
+                ))}
+              </select>
             </div>
-          ) : (
-            <div />
-          )}
-          <div className="flex items-end">
-            <Button type="button" className="w-full" onClick={() => void load()}>
+            <div className="min-w-0">
+              {tipoDeclaracion !== 'aguinaldo' ? (
+                <Input
+                  label={tipoDeclaracion === 'otros_documentos' ? 'Mes de subida' : 'Mes gestión'}
+                  type="month"
+                  value={mesGestion}
+                  onChange={(e) => setMesGestion(e.target.value)}
+                />
+              ) : (
+                <Input
+                  label="Año"
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={anioGestion}
+                  onChange={(e) => setAnioGestion(Number(e.target.value || new Date().getFullYear()))}
+                />
+              )}
+            </div>
+            {tipoDeclaracion === 'mensual' ? (
+              <div className="min-w-0 space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</label>
+                <select value={modulo} onChange={(e) => setModulo(e.target.value)} className="input w-full min-w-0 py-2.5">
+                  <option value="">Todos</option>
+                  <option value="afp">AFP</option>
+                  <option value="caja">CAJA</option>
+                  <option value="ministerio">Ministerio</option>
+                </select>
+              </div>
+            ) : tipoDeclaracion === 'otros_documentos' ? (
+              <div className="min-w-0 space-y-2 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</span>
+                <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                  Filtra por empresa y mes calendario en que se subió el PDF (misma sección que en personal del
+                  colaborador).
+                </p>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+            <Button type="button" className="w-full min-h-[44px] sm:w-auto sm:min-w-[10rem]" onClick={() => void load()}>
               Buscar
             </Button>
-          </div>
-          <div className="flex items-end">
             <Button
               type="button"
               variant="secondary"
-              className="w-full"
+              className="w-full min-h-[44px] sm:w-auto sm:min-w-[10rem]"
               icon={<Download className="h-4 w-4" />}
               onClick={() => void onExportPdf()}
               disabled={exporting || tipoDeclaracion !== 'mensual'}

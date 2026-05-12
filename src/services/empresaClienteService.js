@@ -344,26 +344,6 @@ export const empresaClienteService = {
     }
   },
 
-  async uploadMiEmpresaDocumento(tipoDocumento, file) {
-    try {
-      const formData = new FormData()
-      formData.append('archivo', file)
-      const response = await api.post(`/empresa-cliente/mi-empresa/documentos/${tipoDocumento}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      return {
-        success: Boolean(response.data?.success),
-        data: response.data?.data,
-        message: response.data?.message || (response.data?.success ? 'Documento cargado.' : MESSAGES.ERROR_FETCH),
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
-      }
-    }
-  },
-
   async fetchMiEmpresaDocumentoVistaPreviaBlob(tipoDocumento) {
     try {
       const response = await api.get(`/empresa-cliente/mi-empresa/documentos/${tipoDocumento}/vista-previa`, {

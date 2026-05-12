@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Download, Eye, FileText, RefreshCw, Upload } from 'lucide-react'
+import { Download, Eye, FileText } from 'lucide-react'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
@@ -26,7 +26,6 @@ function formatDate(value) {
 export default function EmpresaClienteMiEmpresa() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [uploadingKey, setUploadingKey] = useState('')
   const [preview, setPreview] = useState({
     open: false,
     title: '',
@@ -35,7 +34,6 @@ export default function EmpresaClienteMiEmpresa() {
     key: '',
     nombreOriginal: '',
   })
-  const fileInputRefs = useRef({})
 
   const mapped = useMemo(() => {
     const byKey = new Map(rows.map((r) => [r.tipo_documento, r]))
@@ -70,27 +68,6 @@ export default function EmpresaClienteMiEmpresa() {
     },
     [preview.url]
   )
-
-  const openSelector = (key) => {
-    fileInputRefs.current[key]?.click()
-  }
-
-  const onSelectedFile = async (key, file) => {
-    if (!file) return
-    if (file.type !== 'application/pdf') {
-      toast.error('Solo se permiten archivos PDF.')
-      return
-    }
-    setUploadingKey(key)
-    const res = await empresaClienteService.uploadMiEmpresaDocumento(key, file)
-    if (res.success) {
-      toast.success('Documento guardado correctamente.')
-      await load()
-    } else {
-      toast.error(res.message || 'No se pudo subir el documento.')
-    }
-    setUploadingKey('')
-  }
 
   const onPreview = async (row) => {
     const res = await empresaClienteService.fetchMiEmpresaDocumentoVistaPreviaBlob(row.key)
@@ -129,13 +106,14 @@ export default function EmpresaClienteMiEmpresa() {
         <div>
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">Mi empresa</h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Subí y administrá documentos legales de tu empresa. Todos son opcionales y se pueden reemplazar.
+            Documentos legales de tu empresa en PDF. La carga y el reemplazo los realiza tu consultora o colaborador; acá podés
+            consultarlos y descargarlos cuando los hayan subido.
           </p>
         </div>
 
         <Card
           title="Documentos empresariales (PDF)"
-          subtitle="Podés subir, ver y descargar cada archivo cuando lo necesites"
+          subtitle="Solo lectura: ver y descargar"
           gradient
           headerClassName="px-5 py-4"
           bodyClassName="p-0"
@@ -151,84 +129,61 @@ export default function EmpresaClienteMiEmpresa() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {mapped.map((row) => {
-                  const isUploading = uploadingKey === row.key
-                  return (
-                    <tr key={row.key} className="align-top">
-                      <td className="px-4 py-3">
-                        <div className="flex items-start gap-2">
-                          <FileText className="mt-0.5 h-4 w-4 text-primary-600" />
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{row.label}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                        {row.uploaded ? (
-                          <div className="space-y-0.5">
-                            <p className="max-w-[24rem] truncate font-medium">{row.nombre}</p>
-                            <p className="text-xs text-gray-500">{formatSize(row.tamano)}</p>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">Sin archivo</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{formatDate(row.fecha)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          {row.uploaded ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                icon={<Eye className="h-4 w-4" />}
-                                onClick={() => void onPreview(row)}
-                              >
-                                Ver
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                icon={<Download className="h-4 w-4" />}
-                                onClick={() => void onDownload(row)}
-                              >
-                                Descargar
-                              </Button>
-                            </>
-                          ) : null}
-                          <Button
-                            size="sm"
-                            icon={
-                              isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : row.uploaded ? <RefreshCw className="h-4 w-4" /> : <Upload className="h-4 w-4" />
-                            }
-                            loading={isUploading}
-                            onClick={() => openSelector(row.key)}
-                          >
-                            {row.uploaded ? 'Reemplazar' : 'Subir PDF'}
-                          </Button>
-                          <input
-                            ref={(el) => {
-                              fileInputRefs.current[row.key] = el
-                            }}
-                            type="file"
-                            accept="application/pdf"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              e.target.value = ''
-                              void onSelectedFile(row.key, file)
-                            }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {!loading && mapped.length === 0 ? (
+                {loading ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-500">
-                      No hay tipos de documento configurados.
+                      Cargando…
                     </td>
                   </tr>
-                ) : null}
+                ) : (
+                  mapped.map((row) => (
+                  <tr key={row.key} className="align-top">
+                    <td className="px-4 py-3">
+                      <div className="flex items-start gap-2">
+                        <FileText className="mt-0.5 h-4 w-4 text-primary-600" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{row.label}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                      {row.uploaded ? (
+                        <div className="space-y-0.5">
+                          <p className="max-w-[24rem] truncate font-medium">{row.nombre}</p>
+                          <p className="text-xs text-gray-500">{formatSize(row.tamano)}</p>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Sin archivo</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{formatDate(row.fecha)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        {row.uploaded ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              icon={<Eye className="h-4 w-4" />}
+                              onClick={() => void onPreview(row)}
+                            >
+                              Ver
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              icon={<Download className="h-4 w-4" />}
+                              onClick={() => void onDownload(row)}
+                            >
+                              Descargar
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -260,4 +215,3 @@ export default function EmpresaClienteMiEmpresa() {
     </EmpresaClienteShell>
   )
 }
-

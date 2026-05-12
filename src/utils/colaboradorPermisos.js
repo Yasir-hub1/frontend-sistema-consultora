@@ -1,7 +1,7 @@
 /**
- * Permisos de colaborador: el backend guarda flags por módulo en `permisos_por_modulo`
- * y además agrega `puede_editar_personal` / `puede_registrar_personal` si algún módulo los tiene.
- * Estas funciones alinean la UI con ColaboradorAutorizacionService (Laravel).
+ * Permisos de colaborador: flags por módulo en `permisos_por_modulo` (AFP/CAJA/Ministerio) y
+ * `puede_declarar_aguinaldo` en el colaborador para aguinaldo anual (independiente de la declaración mensual).
+ * Alineado con ColaboradorAutorizacionService (Laravel).
  */
 
 import { ROLES, normalizeRole } from './roleUtils'
@@ -59,15 +59,27 @@ export function colaboradorPuedeCargarAlgunaDeclaracionMensual(user) {
   return perms.some((p) => p.puede_gestionar_modulo)
 }
 
-/** Declaración anual de aguinaldo (empresa) */
+/** Declaración anual de aguinaldo (empresa): flag propio en colaborador, no depende de AFP/CAJA/MDT. */
 export function colaboradorPuedeCargarDeclaracionAguinaldo(user) {
-  return colaboradorPuedeCargarAlgunaDeclaracionMensual(user)
+  if (!user) return false
+  if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
+  const c = user.colaborador
+  if (!c) return false
+  if (c.puede_editar_personal || c.puede_registrar_personal) return true
+  return Boolean(c.puede_declarar_aguinaldo)
 }
 
 export function colaboradorPuedeEditarEmpresaCliente(user) {
   if (!user) return false
   if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
   return Boolean(user.colaborador?.puede_editar_empresa_cliente)
+}
+
+/** PDFs legales del catálogo «Mi empresa» (NIT, ROE, etc.): carga vía colaborador/consultora. */
+export function colaboradorPuedeGestionarDocumentosLegalesMiEmpresa(user) {
+  if (!user) return false
+  if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
+  return colaboradorPuedeEditarEmpresaCliente(user) || colaboradorPuedeGestionarOtrosDocumentosEmpresa(user)
 }
 
 /** PDFs varios en el directorio de personal (empresa asignada) */
