@@ -29,6 +29,15 @@ function ProtectedRoute({ children, requiredRoles = [] }) {
     void refreshUser()
   }, [location.pathname, isAuthenticated, user?.rol, refreshUser])
 
+  React.useEffect(() => {
+    if (!isAuthenticated || normalizeRole(user?.rol) !== ROLES.COLABORADOR) return
+    const onFocus = () => {
+      void refreshUser()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [isAuthenticated, user?.rol, refreshUser])
+
   if (loading || (isInitialCheck && localStorage.getItem('token') && !user)) {
     return (
       <div className="flex min-h-screen items-center justify-center">

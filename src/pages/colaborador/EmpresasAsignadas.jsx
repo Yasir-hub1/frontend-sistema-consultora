@@ -1,8 +1,12 @@
 import ColaboradorMiEmpresaDocumentosPanel from '../../components/colaborador/ColaboradorMiEmpresaDocumentosPanel'
 import EmpresasAsignadasPanel from '../../components/colaborador/EmpresasAsignadasPanel'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
+import { useAuth } from '../../contexts/AuthContext'
+import { colaboradorPuedeGestionarDocumentosLegalesMiEmpresa } from '../../utils/colaboradorPermisos'
 
 export default function ColaboradorEmpresasAsignadas() {
+  const { user } = useAuth()
+  const puedeDocumentosLegales = colaboradorPuedeGestionarDocumentosLegalesMiEmpresa(user)
   const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
   return (
@@ -14,16 +18,23 @@ export default function ColaboradorEmpresasAsignadas() {
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
             Solo verás empresas cliente que el titular te haya asignado. Busca, pagina y entra al personal de cada
-            una. Los PDF legales de cada empresa (NIT, ROE, etc.) los cargás acá; el cliente solo los ve y descarga
-            en su portal «Mi empresa».
+            una.
+            {puedeDocumentosLegales
+              ? ' Los PDF legales de cada empresa (NIT, ROE, etc.) los cargás acá; el cliente solo los ve y descarga en su portal «Mi empresa».'
+              : ''}
           </p>
         </div>
 
-        <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
-          <ColaboradorMiEmpresaDocumentosPanel />
-        </div>
+        {puedeDocumentosLegales ? (
+          <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
+            <ColaboradorMiEmpresaDocumentosPanel />
+          </div>
+        ) : null}
 
-        <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(2)}ms` }}>
+        <div
+          className={motionStagger}
+          style={{ animationDelay: `${staggerDelayMs(puedeDocumentosLegales ? 2 : 1)}ms` }}
+        >
           <EmpresasAsignadasPanel variant="page" />
         </div>
       </div>

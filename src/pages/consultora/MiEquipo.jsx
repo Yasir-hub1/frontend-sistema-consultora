@@ -64,13 +64,6 @@ const MODULOS_PERMISO = [
   { key: 'ministerio', label: 'Ministerio' },
 ]
 
-const CAMPOS_PERMISO_MODULO = [
-  'puede_registrar_personal',
-  'puede_editar_personal',
-  'puede_subir_documentos',
-  'puede_gestionar_modulo',
-]
-
 /** Normaliza valores que a veces vienen como 0/1 o string desde APIs. */
 function normalizePermisoBool(v) {
   if (v === true || v === 1 || v === '1') return true
@@ -95,15 +88,29 @@ function buildPermDraft(row) {
   return {
     puede_editar_empresa_cliente: normalizePermisoBool(row.puede_editar_empresa_cliente),
     puede_declarar_aguinaldo: normalizePermisoBool(row.puede_declarar_aguinaldo),
+    puede_gestionar_otros_documentos_empresa: normalizePermisoBool(row.puede_gestionar_otros_documentos_empresa),
+    puede_gestionar_documentos_legales_mi_empresa: normalizePermisoBool(row.puede_gestionar_documentos_legales_mi_empresa),
     permisos,
   }
 }
 
 function serializePermisosParaApi(permisos) {
   return permisos.map((p) => {
-    const o = { modulo: String(p.modulo) }
-    for (const campo of CAMPOS_PERMISO_MODULO) {
-      o[campo] = normalizePermisoBool(p[campo])
+    const registrar = normalizePermisoBool(p.puede_registrar_personal)
+    const editar = normalizePermisoBool(p.puede_editar_personal)
+    const subir = normalizePermisoBool(p.puede_subir_documentos)
+    const gestionar = normalizePermisoBool(p.puede_gestionar_modulo)
+    const operativo = registrar || editar || subir || gestionar
+    const o = {
+      modulo: String(p.modulo),
+      puede_ver: operativo || normalizePermisoBool(p.puede_ver),
+      puede_registrar_personal: registrar,
+      puede_editar_personal: editar,
+      puede_subir_documentos: subir,
+      puede_gestionar_modulo: gestionar,
+      puede_eliminar_documentos: false,
+      puede_exportar_reportes: false,
+      puede_invitar_empresa: false,
     }
     return o
   })
@@ -328,10 +335,29 @@ export default function ConsultoraMiEquipo() {
     const res = await consultoraService.updateColaboradorPermisos(permRow.id, {
       puede_editar_empresa_cliente: normalizePermisoBool(permDraft.puede_editar_empresa_cliente),
       puede_declarar_aguinaldo: normalizePermisoBool(permDraft.puede_declarar_aguinaldo),
+      puede_gestionar_otros_documentos_empresa: normalizePermisoBool(permDraft.puede_gestionar_otros_documentos_empresa),
+      puede_gestionar_documentos_legales_mi_empresa: normalizePermisoBool(permDraft.puede_gestionar_documentos_legales_mi_empresa),
       permisos: serializePermisosParaApi(permDraft.permisos),
     })
     setPermSaving(false)
     if (res.success) {
+      const actualizado = res.data
+      if (actualizado && permRow) {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === permRow.id
+              ? {
+                  ...r,
+                  puede_editar_empresa_cliente: actualizado.puede_editar_empresa_cliente,
+                  puede_declarar_aguinaldo: actualizado.puede_declarar_aguinaldo,
+                  puede_gestionar_otros_documentos_empresa: actualizado.puede_gestionar_otros_documentos_empresa,
+                  puede_gestionar_documentos_legales_mi_empresa: actualizado.puede_gestionar_documentos_legales_mi_empresa,
+                  permisos_por_modulo: actualizado.permisos_por_modulo ?? r.permisos_por_modulo,
+                }
+              : r
+          )
+        )
+      }
       closePermisos()
       await load()
       setMsg('Permisos actualizados.')
@@ -925,6 +951,47 @@ export default function ConsultoraMiEquipo() {
                 </span>
               </span>
             </label>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/40">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Documentos de la empresa</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Permisos del portal colaborador para PDFs a nivel empresa (no por empleado).
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {[
+                  {
+                    campo: 'puede_gestionar_otros_documentos_empresa',
+                    label: 'Otros documentos (empresa)',
+                    hint: 'Subir y gestionar PDFs varios en Personal de la empresa asignada (sección «Otros documentos»).',
+                  },
+                  {
+                    campo: 'puede_gestionar_documentos_legales_mi_empresa',
+                    label: 'Documentos legales «Mi empresa»',
+                    hint: 'NIT, ROE, matrícula y catálogo legal en Empresas asignadas (el cliente solo ve y descarga).',
+                  },
+                ].map(({ campo, label, hint }) => (
+                  <label
+                    key={campo}
+                    className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent p-1 text-xs text-gray-700 hover:border-gray-200 dark:text-gray-300 dark:hover:border-gray-600"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      checked={normalizePermisoBool(permDraft[campo])}
+                      onChange={(e) =>
+                        setPermDraft((d) => ({ ...d, [campo]: e.target.checked }))
+                      }
+                    />
+                    <span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">{label}</span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                        {hint}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-4">
               {permDraft.permisos.map((p, idx) => {

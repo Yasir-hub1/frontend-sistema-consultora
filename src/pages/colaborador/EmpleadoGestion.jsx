@@ -24,6 +24,7 @@ import Button from '../../components/common/Button'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 import Input from '../../components/common/Input'
 import {
+  colaboradorPuedeAccederModulo,
   colaboradorPuedeEditarEmpresaCliente,
   colaboradorPuedeEditarLegajoGlobal,
   colaboradorPuedeSubirDocumentosEnModulo,
@@ -264,6 +265,19 @@ export default function ColaboradorEmpleadoGestion() {
   const canEditLegajo = colaboradorPuedeEditarLegajoGlobal(user)
   const canUploadInTab = colaboradorPuedeSubirDocumentosEnModulo(user, tab)
   const canEditEmpresa = colaboradorPuedeEditarEmpresaCliente(user)
+  const modulosVisibles = useMemo(
+    () => MODULOS.filter((m) => colaboradorPuedeAccederModulo(user, m.key)),
+    [user]
+  )
+  const puedeAfp = colaboradorPuedeAccederModulo(user, 'afp')
+  const puedeCaja = colaboradorPuedeAccederModulo(user, 'caja')
+  const puedeMinisterio = colaboradorPuedeAccederModulo(user, 'ministerio')
+
+  useEffect(() => {
+    if (modulosVisibles.length > 0 && !modulosVisibles.some((m) => m.key === tab)) {
+      setTab(modulosVisibles[0].key)
+    }
+  }, [modulosVisibles, tab])
   const [editPersonaOpen, setEditPersonaOpen] = useState(false)
   const [editEmpresaOpen, setEditEmpresaOpen] = useState(false)
   const [savingPersona, setSavingPersona] = useState(false)
@@ -701,6 +715,7 @@ export default function ColaboradorEmpleadoGestion() {
       )}
 
       {/* Estado de gestiones — arriba, ancho completo, cambio de módulo y régimen CAJA rápido */}
+      {modulosVisibles.length > 0 ? (
       <section
         className={`overflow-hidden rounded-2xl border border-gray-200/90 bg-gradient-to-br from-white via-gray-50/80 to-white shadow-sm dark:border-gray-700/90 dark:from-gray-900/80 dark:via-gray-900/50 dark:to-gray-900/80 ${motionStagger}`}
         style={{ animationDelay: `${staggerDelayMs(0)}ms` }}
@@ -710,8 +725,9 @@ export default function ColaboradorEmpleadoGestion() {
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">CAJA: elige régimen antes de subir.</p>
         </div>
         <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth p-3 pb-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] md:grid md:snap-none md:grid-cols-3 md:gap-4 md:overflow-visible md:p-4 md:pb-4">
-          <button
-            type="button"
+          {puedeAfp ? (
+            <button
+              type="button"
             onClick={() => {
               setTab('afp')
               setMsg(null)
@@ -734,7 +750,9 @@ export default function ColaboradorEmpleadoGestion() {
               />
             </div>
           </button>
+          ) : null}
 
+          {puedeCaja ? (
           <div
             className={clsx(
               'flex min-w-[min(100%,288px)] shrink-0 snap-center flex-col rounded-xl border-2 bg-white/90 p-3 shadow-sm dark:bg-gray-900/60 md:min-w-0',
@@ -805,7 +823,9 @@ export default function ColaboradorEmpleadoGestion() {
               <p className="mt-2 text-center text-[10px] text-amber-700 dark:text-amber-300/90">Elige régimen para cargar tipos</p>
             ) : null}
           </div>
+          ) : null}
 
+          {puedeMinisterio ? (
           <button
             type="button"
             onClick={() => {
@@ -832,8 +852,10 @@ export default function ColaboradorEmpleadoGestion() {
               />
             </div>
           </button>
+          ) : null}
         </div>
       </section>
+      ) : null}
 
       <div className={`grid gap-6 lg:grid-cols-[minmax(280px,320px)_1fr] ${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
         {/* Columna identidad (mockup personal-card) */}
@@ -993,12 +1015,14 @@ export default function ColaboradorEmpleadoGestion() {
 
         {/* Columna módulos y documentos */}
         <div className="min-w-0">
+          {modulosVisibles.length > 0 ? (
+          <>
           <div
             className="-mx-1 mb-2 flex gap-0 overflow-x-auto overscroll-x-contain scroll-smooth border-b-2 border-gray-200 [scrollbar-width:thin] dark:border-gray-700 md:mx-0 md:flex-wrap md:overflow-visible"
             role="tablist"
             aria-label="Módulos AFP, CAJA, Ministerio"
           >
-            {MODULOS.map((m) => (
+            {modulosVisibles.map((m) => (
               <button
                 key={m.key}
                 type="button"
@@ -1206,6 +1230,12 @@ export default function ColaboradorEmpleadoGestion() {
                   </div>
                 )
               })}
+            </div>
+          )}
+          </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
+              Tu consultora no te asignó permisos de módulo (AFP, CAJA o Ministerio de Trabajo) para gestionar documentos de este empleado.
             </div>
           )}
         </div>

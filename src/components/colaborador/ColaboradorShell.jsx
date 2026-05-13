@@ -1,7 +1,37 @@
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
+import { useAuth } from '../../contexts/AuthContext'
+import { normalizeRole, ROLES } from '../../utils/roleUtils'
+import LoadingSpinner from '../common/LoadingSpinner'
 
 /** Fondo suave + capa de contenido para páginas colaborador. */
 export default function ColaboradorShell({ children, className }) {
+  const { user, refreshUser } = useAuth()
+  const [permisosListos, setPermisosListos] = useState(() => normalizeRole(user?.rol) !== ROLES.COLABORADOR)
+
+  useEffect(() => {
+    if (normalizeRole(user?.rol) !== ROLES.COLABORADOR) {
+      setPermisosListos(true)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      await refreshUser()
+      if (!cancelled) setPermisosListos(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshUser, user?.rol])
+
+  if (!permisosListos) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
   return (
     <div className={clsx('relative isolate', className)}>
       <div
