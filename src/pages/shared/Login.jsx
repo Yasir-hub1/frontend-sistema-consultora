@@ -87,11 +87,11 @@ const Login = () => {
                   <Layers className="h-7 w-7 text-white" strokeWidth={1.75} />
                 </div>
                 <span className="font-semibold uppercase tracking-[0.2em] text-white/90 text-[0.625rem]">
-                  Consult-360
+                  HUMBERTO MORENO PEREZ
                 </span>
               </div>
               <h1 className="font-display text-4xl font-extrabold tracking-tight text-white xl:text-5xl motion-safe:animate-fade-in motion-reduce:animate-none">
-                Tu operación laboral, en un solo lugar
+                HUMBERTO MORENO PEREZ
               </h1>
               <p className="mt-4 max-w-md text-base leading-relaxed text-white/85 motion-safe:animate-fade-in motion-reduce:animate-none motion-safe:[animation-delay:80ms]">
                 Acceso unificado para administrador, consultora, colaborador y empresa
@@ -109,7 +109,7 @@ const Login = () => {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary-600 dark:text-primary-400">
-                    Consult-360
+                    HUMBERTO MORENO PEREZ
                   </p>
                   <p className="text-sm text-secondary-500 dark:text-secondary-400">
                     Portal de acceso

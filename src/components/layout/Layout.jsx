@@ -189,7 +189,7 @@ const Layout = () => {
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-700">
           <Link to="/" className="flex items-center gap-2 font-semibold text-primary-600">
             <FileStack className="h-7 w-7" />
-            Consult-360
+            HUMBERTO MORENO PEREZ
           </Link>
           <button
             type="button"

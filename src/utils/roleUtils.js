@@ -1,5 +1,5 @@
 /**
- * Roles Consult-360 — alineados a `usuarios.tipo` del backend.
+ * Roles HUMBERTO MORENO PEREZ — alineados a `usuarios.tipo` del backend.
  * Valores canónicos en mayúsculas para el frontend.
  */
 

@@ -201,7 +201,7 @@ function EntregaPreview({
       </div>
 
       <p className="mt-6 text-center text-[10px] text-gray-400">
-        Vista previa · Consult-360 · {new Date().getFullYear()}
+        Vista previa · HUMBERTO MORENO PEREZ · {new Date().getFullYear()}
       </p>
     </div>
   )

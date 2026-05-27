@@ -1,4 +1,4 @@
-// Servicio de autenticación — Consult-360 (Sanctum)
+// Servicio de autenticación — HUMBERTO MORENO PEREZ (Sanctum)
 
 import { get, post, put } from './api'
 import { MESSAGES } from '../utils/constants'
@@ -136,7 +136,7 @@ export const authService = {
   },
 
   /**
-   * Login unificado Consult-360 — el backend discrimina por `usuarios.tipo`.
+   * Login unificado HUMBERTO MORENO PEREZ — el backend discrimina por `usuarios.tipo`.
    * POST /auth/login
    */
   async loginLaboraConsult(credentials) {

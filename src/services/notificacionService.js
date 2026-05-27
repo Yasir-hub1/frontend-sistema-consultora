@@ -166,7 +166,7 @@ export const notificacionService = {
   },
 
   /**
-   * Marcar alerta del panel (Consult-360) como leída según el rol del usuario.
+   * Marcar alerta del panel (HUMBERTO MORENO PEREZ) como leída según el rol del usuario.
    * @param {number} id - ID de la alerta
    * @param {string} roleOrTipo - Rol normalizado o tipo backend
    */

@@ -55,7 +55,7 @@ const Home = () => {
               <Layers className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Consult-360</p>
+              <p className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">HUMBERTO MORENO PEREZ</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Gestión laboral AFP · CAJA · Ministerio</p>
             </div>
           </div>
@@ -90,7 +90,8 @@ const Home = () => {
               Precision administrativa
             </span>
             <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-              Gestión de consultoría con diseño claro y control total
+              HUMBERTO MORENO PEREZ <br />
+              {/* Gestión de consultoría con diseño claro y control total */}
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-200">
               Desde la activación de consultoras hasta el portal de empresa cliente, tu operación laboral
@@ -237,7 +238,7 @@ const Home = () => {
 
       <footer className="border-t border-slate-200 bg-white py-10 dark:border-slate-800 dark:bg-slate-950">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-sm text-slate-500 dark:text-slate-400 md:flex-row md:px-6">
-          <p>Consult-360 — Sistema de gestión laboral (Bolivia).</p>
+          <p>HUMBERTO MORENO PEREZ — Sistema de gestión laboral (Bolivia).</p>
           <div className="flex items-center gap-4">
             <Link to="/flujo-operativo" className="hover:text-primary-700 dark:hover:text-primary-300">
               Flujo operativo
