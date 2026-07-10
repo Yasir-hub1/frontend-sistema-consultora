@@ -30,6 +30,10 @@ import ColaboradorEmpresas from '../pages/colaborador/EmpresasAsignadas'
 import ColaboradorPersonal from '../pages/colaborador/PersonalLista'
 import ColaboradorEmpleado from '../pages/colaborador/EmpleadoGestion'
 
+import TramitesListaPage from '../pages/tramites/TramitesLista'
+import TramitesAgendaPage from '../pages/tramites/TramitesAgenda'
+import TramiteDetallePage from '../pages/tramites/TramiteDetalle'
+
 import EmpresaClienteDashboard from '../pages/empresa-cliente/Dashboard'
 import EmpresaClientePersonal from '../pages/empresa-cliente/Personal'
 import EmpresaClienteEmpleado from '../pages/empresa-cliente/EmpleadoVista'
@@ -110,6 +114,9 @@ const AppRoutes = () => {
         <Route path="alertas" element={<ConsultoraAlertas />} />
         <Route path="catalogo-documentos" element={<ConsultoraCatalogoDocumentos />} />
         <Route path="reportes" element={<ConsultoraReportes />} />
+        <Route path="tramites" element={<TramitesListaPage />} />
+        <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
+        <Route path="tramites/:id" element={<TramiteDetallePage />} />
         <Route path="perfil" element={<Perfil />} />
       </Route>
 
@@ -129,6 +136,9 @@ const AppRoutes = () => {
           path="empresas/:empresaId/personal/:personalId"
           element={<ColaboradorEmpleado />}
         />
+        <Route path="tramites" element={<TramitesListaPage />} />
+        <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
+        <Route path="tramites/:id" element={<TramiteDetallePage />} />
         <Route path="perfil" element={<Perfil />} />
       </Route>
 
@@ -148,6 +158,9 @@ const AppRoutes = () => {
         <Route path="personal" element={<EmpresaClientePersonal />} />
         <Route path="personal/:personalId" element={<EmpresaClienteEmpleado />} />
         <Route path="mi-consultora" element={<EmpresaClienteMiConsultora />} />
+        <Route path="tramites" element={<TramitesListaPage />} />
+        <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
+        <Route path="tramites/:id" element={<TramiteDetallePage />} />
         <Route path="perfil" element={<Perfil />} />
       </Route>
 

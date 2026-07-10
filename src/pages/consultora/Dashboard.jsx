@@ -9,14 +9,18 @@ import {
   Briefcase,
   Bell,
   Files,
+  ClipboardList,
 } from 'lucide-react'
 import Card from '../../components/common/Card'
+import TramiteResumenCards from '../../components/tramites/TramiteResumenCards'
 import { consultoraService } from '../../services/consultoraService'
+import { tramiteService } from '../../services/tramiteService'
+import { ROLES } from '../../utils/roleUtils'
 
 const actions = [
   {
     to: '/consultora/configuracion',
-    label: 'Configuraci√≥n',
+    label: 'Configuraci?n',
     desc: 'Marca, soporte, bancos y plantillas',
     icon: Settings,
     color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
@@ -34,6 +38,13 @@ const actions = [
     desc: 'Clientes y accesos de solo lectura',
     icon: Briefcase,
     color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  },
+  {
+    to: '/consultora/tramites',
+    label: 'Tr?mites',
+    desc: 'Tareas, vencimientos y seguimiento',
+    icon: ClipboardList,
+    color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
   },
   {
     to: '/consultora/alertas',
@@ -54,6 +65,7 @@ const actions = [
 export default function ConsultoraDashboard() {
   const [cfg, setCfg] = useState(null)
   const [note, setNote] = useState(null)
+  const [tramiteResumen, setTramiteResumen] = useState(null)
 
   useEffect(() => {
     let c = false
@@ -66,6 +78,13 @@ export default function ConsultoraDashboard() {
     return () => {
       c = true
     }
+  }, [])
+
+  useEffect(() => {
+    void (async () => {
+      const res = await tramiteService.getResumen(ROLES.CONSULTORA)
+      if (res.success) setTramiteResumen(res.data)
+    })()
   }, [])
 
   const completa = cfg?.configuracion_completa ?? cfg?.configuracionCompleta
@@ -86,7 +105,7 @@ export default function ConsultoraDashboard() {
             {nombre}
           </h1>
           <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
-            Accesos r√°pidos a configuraci√≥n, equipo interno, empresas cliente y alertas.
+            Accesos r?pidos a configuraci?n, equipo interno, empresas cliente y alertas.
           </p>
         </div>
       </div>
@@ -120,12 +139,12 @@ export default function ConsultoraDashboard() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
-                {completa ? 'Consultora operativa' : 'Configuraci√≥n pendiente'}
+                {completa ? 'Consultora operativa' : 'Configuraci?n pendiente'}
               </h2>
               <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                 {completa
-                  ? 'Puedes gestionar clientes, equipo y documentaci√≥n con normalidad.'
-                  : 'Completa el asistente de configuraci√≥n inicial para desbloquear todas las √°reas.'}
+                  ? 'Puedes gestionar clientes, equipo y documentaci?n con normalidad.'
+                  : 'Completa el asistente de configuraci?n inicial para desbloquear todas las ?reas.'}
               </p>
             </div>
           </div>
@@ -133,14 +152,29 @@ export default function ConsultoraDashboard() {
             to="/consultora/configuracion"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
           >
-            {completa ? 'Revisar configuraci√≥n' : 'Continuar configuraci√≥n'}
+            {completa ? 'Revisar configuraci?n' : 'Continuar configuraci?n'}
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
 
+      {tramiteResumen ? (
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Tr?mites</h3>
+            <Link
+              to="/consultora/tramites/agenda"
+              className="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+            >
+              Ver agenda
+            </Link>
+          </div>
+          <TramiteResumenCards resumen={tramiteResumen} basePath="/consultora/tramites" />
+        </div>
+      ) : null}
+
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Accesos r√°pidos</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Accesos r?pidos</h3>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {actions.map(({ to, label, desc, icon: Icon, color }) => (
             <Link
@@ -168,7 +202,7 @@ export default function ConsultoraDashboard() {
         <dl className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
             <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Configuraci√≥n
+              Configuraci?n
             </dt>
             <dd className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
               {completa ? 'Completa' : 'En progreso'}
@@ -179,7 +213,7 @@ export default function ConsultoraDashboard() {
               NIT
             </dt>
             <dd className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
-              {cfg?.consultora?.nit ?? '‚ˇˇ'}
+              {cfg?.consultora?.nit ?? 'ˇˇˇ'}
             </dd>
           </div>
         </dl>

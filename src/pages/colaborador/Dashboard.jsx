@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Bell, Briefcase, Check, ChevronRight, LayoutDashboard, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Bell, Briefcase, Check, ChevronRight, LayoutDashboard, ShieldCheck, ClipboardList } from 'lucide-react'
 import EmpresasAsignadasPanel from '../../components/colaborador/EmpresasAsignadasPanel'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
+import TramiteResumenCards from '../../components/tramites/TramiteResumenCards'
 import { colaboradorService } from '../../services/colaboradorService'
+import { tramiteService } from '../../services/tramiteService'
 import { notificacionService } from '../../services/notificacionService'
 import { useAuth } from '../../contexts/AuthContext'
 import { resolveAlertaPath } from '../../utils/alertaNavigation'
 import { sanitizeUiMessage } from '../../utils/uiMessage'
+import { ROLES } from '../../utils/roleUtils'
 
 export default function ColaboradorDashboard() {
   const [data, setData] = useState(null)
   const [alertasList, setAlertasList] = useState([])
+  const [tramiteResumen, setTramiteResumen] = useState(null)
   const [msg, setMsg] = useState(null)
   const [loading, setLoading] = useState(true)
   const [alertasRefresh, setAlertasRefresh] = useState(0)
@@ -40,6 +44,13 @@ export default function ColaboradorDashboard() {
       cancelled = true
     }
   }, [alertasRefresh])
+
+  useEffect(() => {
+    void (async () => {
+      const res = await tramiteService.getResumen(ROLES.COLABORADOR)
+      if (res.success) setTramiteResumen(res.data)
+    })()
+  }, [])
 
   const marcarAlertaLeida = async (id) => {
     const r = await notificacionService.marcarAlertaLeida(id, user?.rol ?? user?.tipo)
@@ -179,7 +190,25 @@ export default function ColaboradorDashboard() {
           })}
         </div>
 
-        <div className={`${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(2)}ms` }}>
+        {tramiteResumen ? (
+          <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(2)}ms` }}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                <ClipboardList className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                Trámites
+              </h2>
+              <Link
+                to="/colaborador/tramites/agenda"
+                className="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+              >
+                Agenda
+              </Link>
+            </div>
+            <TramiteResumenCards resumen={tramiteResumen} basePath="/colaborador/tramites" />
+          </div>
+        ) : null}
+
+        <div className={`${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(3)}ms` }}>
           <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/50">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">

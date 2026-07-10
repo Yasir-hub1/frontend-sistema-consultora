@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   FileText,
   Files,
+  ClipboardList,
   Check,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -114,6 +115,7 @@ const Layout = () => {
     { name: 'Catálogo documentos', href: '/consultora/catalogo-documentos', icon: FileStack },
     { name: 'Mi equipo', href: '/consultora/mi-equipo', icon: Users },
     { name: 'Mis empresas', href: '/consultora/mis-empresas', icon: Briefcase },
+    { name: 'Trámites', href: '/consultora/tramites', icon: ClipboardList },
     { name: 'Alertas', href: '/consultora/alertas', icon: Bell },
     { name: 'Reportes', href: '/consultora/reportes', icon: Files },
   ]
@@ -121,6 +123,7 @@ const Layout = () => {
   const colaboradorNav = [
     { name: 'Inicio', href: '/colaborador/dashboard', icon: Home },
     { name: 'Empresas asignadas', href: '/colaborador/empresas', icon: Briefcase },
+    { name: 'Trámites', href: '/colaborador/tramites', icon: ClipboardList },
   ]
 
   const empresaNav = [
@@ -128,6 +131,7 @@ const Layout = () => {
     { name: 'Personal', href: '/empresa-cliente/personal', icon: Users },
     { name: 'Declaración mensual', href: '/empresa-cliente/declaraciones-mensuales', icon: FileSpreadsheet },
     { name: 'Docs. colaborador', href: '/empresa-cliente/otros-documentos', icon: FileText },
+    { name: 'Trámites', href: '/empresa-cliente/tramites', icon: ClipboardList },
     { name: 'Mi empresa', href: '/empresa-cliente/mi-empresa', icon: Files },
     { name: 'Mi consultora', href: '/empresa-cliente/mi-consultora', icon: Building2 },
   ]
@@ -189,7 +193,7 @@ const Layout = () => {
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-700">
           <Link to="/" className="flex items-center gap-2 font-semibold text-primary-600">
             <FileStack className="h-7 w-7" />
-            Consult-360
+            MI EMPRESA
           </Link>
           <button
             type="button"

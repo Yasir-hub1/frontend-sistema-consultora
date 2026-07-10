@@ -36,5 +36,19 @@ export function resolveAlertaPath(alerta, viewerRole) {
     if (r === ROLES.CONSULTORA) return '/consultora/reportes'
   }
 
+  const tramiteModulos = [
+    'tramite_asignado',
+    'tramite_recordatorio',
+    'tramite_periodo_nuevo',
+    'tramite_tareas_pendientes',
+    'tramite_recurrencia_anulada',
+    'tramite_anulado',
+  ]
+  if (tramiteModulos.includes(mod)) {
+    const tid = alerta.contexto?.tramite_id
+    if (r === ROLES.CONSULTORA && tid) return `/consultora/tramites/${tid}`
+    if (r === ROLES.COLABORADOR && tid) return `/colaborador/tramites/${tid}`
+  }
+
   return null
 }
