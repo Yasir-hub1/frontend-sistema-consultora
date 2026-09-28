@@ -123,6 +123,7 @@ const Layout = () => {
   const colaboradorNav = [
     { name: 'Inicio', href: '/colaborador/dashboard', icon: Home },
     { name: 'Empresas asignadas', href: '/colaborador/empresas', icon: Briefcase },
+    { name: 'Reportes', href: '/colaborador/reportes', icon: Files },
     { name: 'Trámites', href: '/colaborador/tramites', icon: ClipboardList },
   ]
 

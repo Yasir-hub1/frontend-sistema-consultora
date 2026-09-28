@@ -28,6 +28,7 @@ import {
 import DeclaracionExcelPreview, {
   parseDeclaracionExcelBlob,
 } from '../../components/colaborador/DeclaracionExcelPreview'
+import GestoraPersonalPanel from '../../components/colaborador/GestoraPersonalPanel'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
@@ -42,6 +43,7 @@ import {
   colaboradorPuedeCargarAlgunaDeclaracionMensual,
   colaboradorPuedeCargarDeclaracionAguinaldo,
   colaboradorPuedeCargarDeclaracionMensualEnModulo,
+  colaboradorPuedeEditarLegajoGlobal,
   colaboradorPuedeGestionarOtrosDocumentosEmpresa,
   colaboradorPuedeRegistrarPersonal,
 } from '../../utils/colaboradorPermisos'
@@ -272,6 +274,7 @@ export default function ColaboradorPersonalLista() {
   const { user } = useAuth()
   const { empresaId } = useParams()
   const canRegistrarPersonal = colaboradorPuedeRegistrarPersonal(user)
+  const canEditarLegajo = colaboradorPuedeEditarLegajoGlobal(user)
   const canGestionarOtrosDocumentos = colaboradorPuedeGestionarOtrosDocumentosEmpresa(user)
   const canSubirDeclaracionMensual = colaboradorPuedeCargarAlgunaDeclaracionMensual(user)
   const canSubirDeclaracionAguinaldo = colaboradorPuedeCargarDeclaracionAguinaldo(user)
@@ -296,6 +299,7 @@ export default function ColaboradorPersonalLista() {
   const [perPage, setPerPage] = useState(PAGINATION_CONFIG.DEFAULT_PAGE_SIZE)
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
+  const [pestana, setPestana] = useState('gestora')
   const [total, setTotal] = useState(0)
   const [lastPage, setLastPage] = useState(1)
 
@@ -379,14 +383,18 @@ export default function ColaboradorPersonalLista() {
   }
 
   const onGuardarDeclaracionesMes = async () => {
-    const modulosConArchivo = DECL_MODULOS.filter((m) => declBorradores[m].file)
+    const modulosConArchivo = DECL_MODULOS.filter((m) => {
+      const borrador = declBorradores[m]
+      if (borrador.file) return true
+      return Object.values(borrador.montos).some((v) => String(v ?? '').trim() !== '')
+    })
     if (modulosConArchivo.length === 0) {
-      toast.error('Agrega al menos un PDF en AFP, CAJA o Ministerio.')
+      toast.error('Indica al menos un monto o adjunta un PDF en AFP, CAJA o Ministerio.')
       return
     }
     for (const modulo of modulosConArchivo) {
       const { file } = declBorradores[modulo]
-      if (!isPdfFile(file)) {
+      if (file && !isPdfFile(file)) {
         toast.error(`${etiquetaModuloDeclaracion(modulo)}: solo se permiten archivos PDF.`)
         return
       }
@@ -408,7 +416,7 @@ export default function ColaboradorPersonalLista() {
       const fd = new FormData()
       fd.append('modulo', modulo)
       fd.append('mes_gestion', declMes)
-      fd.append('archivo', file)
+      if (file) fd.append('archivo', file)
       const permitidas = new Set(DECLARACION_CAMPOS_POR_MODULO[modulo] ?? [])
       for (const [k, v] of Object.entries(montos)) {
         if (!permitidas.has(k)) continue
@@ -706,12 +714,15 @@ export default function ColaboradorPersonalLista() {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm({
     defaultValues: {
       nombres: '',
       apellidos: '',
       ci: '',
+      numero_cua: '',
+      dias_trabajados: '',
+      total_ganado: '',
       correo_electronico: '',
       cuenta_bancaria: '',
       fecha_ingreso: new Date().toISOString().slice(0, 10),
@@ -801,6 +812,9 @@ export default function ColaboradorPersonalLista() {
     fd.append('nombres', data.nombres)
     fd.append('apellidos', data.apellidos)
     fd.append('ci', data.ci)
+    if (String(data.numero_cua || '').trim()) fd.append('numero_cua', String(data.numero_cua).trim())
+    if (String(data.dias_trabajados ?? '').trim() !== '') fd.append('dias_trabajados', String(data.dias_trabajados).trim())
+    if (String(data.total_ganado ?? '').trim() !== '') fd.append('total_ganado', String(data.total_ganado).trim())
     fd.append('cargo', 'Personal')
     fd.append('fecha_ingreso', data.fecha_ingreso)
     if (data.correo_electronico) fd.append('correo_electronico', data.correo_electronico)
@@ -947,13 +961,39 @@ export default function ColaboradorPersonalLista() {
         </div>
       )}
 
+      <div role="tablist" aria-label="Vistas de personal" className="flex flex-wrap gap-2">
+        {[
+          // { id: 'directorio', label: 'Directorio' },
+          { id: 'gestora', label: 'Gestora' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={pestana === tab.id}
+            onClick={() => setPestana(tab.id)}
+            className={clsx(
+              'rounded-full px-4 py-2 text-sm font-semibold transition-colors',
+              pestana === tab.id
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-800'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {pestana === 'gestora' ? (
+        <GestoraPersonalPanel empresaId={empresaId} canEdit={canEditarLegajo} />
+      ) : (
       <Card title="Directorio de personal" subtitle={rangeLabel} gradient>
         <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="relative min-w-0 max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
-              placeholder="Buscar por nombre, apellido o CI…"
+              placeholder="Buscar por nombre, apellido, CI o CUA…"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
               className="input w-full pl-10"
@@ -1163,6 +1203,7 @@ export default function ColaboradorPersonalLista() {
           </>
         )}
       </Card>
+      )}
 
       <Modal
         isOpen={otrosDocsModalOpen}
@@ -1505,13 +1546,18 @@ export default function ColaboradorPersonalLista() {
 
             <div className="sticky bottom-0 z-10 -mx-2 flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50/95 p-3 backdrop-blur-sm dark:border-gray-600 dark:bg-gray-900/90 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Solo se envían los módulos con PDF. Los montos vacíos se guardan como sin valor. Puedes volver a cargar el
-                mismo mes para <span className="font-medium">editar</span> (reemplazo).
+                El PDF es opcional. Se envían los módulos que tengan un monto o un PDF. Los montos vacíos quedan sin
+                valor. Puedes volver a cargar el mismo mes para <span className="font-medium">editar</span>.
               </p>
               <Button
                 type="button"
                 size="sm"
-                disabled={declUploading || DECL_MODULOS.every((m) => !declBorradores[m].file)}
+                disabled={
+                  declUploading ||
+                  DECL_MODULOS.every(
+                    (m) => !declBorradores[m].file && Object.values(declBorradores[m].montos).every((v) => String(v ?? '').trim() === ''),
+                  )
+                }
                 onClick={() => void onGuardarDeclaracionesMes()}
                 icon={<FileSpreadsheet className="h-4 w-4" />}
                 className="shrink-0 sm:min-w-[12rem]"
@@ -1863,9 +1909,11 @@ export default function ColaboradorPersonalLista() {
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
             <p className="text-sm font-semibold text-gray-900 dark:text-white">Columnas</p>
             <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-              NOMBRES, APELLIDOS, CI, FECHA_NACIMIENTO(YYYY-MM-DD) opcional, FECHA_INGRESO(YYYY-MM-DD), CARGO opcional,
-              CORREO_ELECTRONICO opcional, CUENTA_BANCARIA opcional, CONTACTO_REFERENCIA_1, CONTACTO_REFERENCIA_2,
-              CONTACTO_REFERENCIA_3 opcional (mínimo 2 contactos con datos entre las tres columnas).
+              NOMBRES, APELLIDOS, CI, NRO_CUA (CUA/RUA, opcional, solo dígitos), DIAS_TRABAJADOS opcional (0 a 31),
+              TOTAL_GANADO opcional (por ejemplo 8500.00), FECHA_NACIMIENTO(YYYY-MM-DD) opcional, FECHA_INGRESO(YYYY-MM-DD),
+              CARGO opcional, CORREO_ELECTRONICO opcional, CUENTA_BANCARIA opcional, CONTACTO_REFERENCIA_1,
+              CONTACTO_REFERENCIA_2, CONTACTO_REFERENCIA_3 opcional (mínimo 2 contactos con datos entre las tres columnas).
+              Días y total ganado quedan en el mes de la fecha de ingreso.
             </p>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/30">
@@ -1944,6 +1992,58 @@ export default function ColaboradorPersonalLista() {
               label="Carnet de identidad"
               leftIcon={<CreditCard className="h-4 w-4" />}
               {...register('ci', { required: 'Obligatorio' })}
+            />
+            <Input
+              label="Nro. CUA / RUA"
+              helperText="Código del asegurado en la Gestora. Opcional, solo números."
+              inputMode="numeric"
+              {...register('numero_cua', {
+                validate: (value) => {
+                  const texto = String(value || '').trim()
+                  if (!texto) return true
+                  if (!/^[\d\s-]+$/.test(texto)) return 'Solo números'
+                  const digitos = texto.replace(/\D/g, '')
+                  if (digitos.length < 4 || digitos.length > 20) return 'Entre 4 y 20 dígitos'
+                  return true
+                },
+              })}
+              error={errors.numero_cua?.message}
+            />
+            <Input
+              label="Días trabajados"
+              type="number"
+              min="0"
+              max="31"
+              step="1"
+              inputMode="numeric"
+              helperText="Opcional. Se guarda en el mes de la fecha de ingreso. Vacío usa 30 en Gestora."
+              {...register('dias_trabajados', {
+                validate: (value) => {
+                  const texto = String(value ?? '').trim()
+                  if (!texto) return true
+                  if (!/^\d+$/.test(texto)) return 'Entero entre 0 y 31'
+                  if (Number(texto) > 31) return 'Entre 0 y 31'
+                  return true
+                },
+              })}
+              error={errors.dias_trabajados?.message}
+            />
+            <Input
+              label="Total ganado"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              helperText="Opcional. Bolivianos del mes de ingreso, por ejemplo 8500.00."
+              {...register('total_ganado', {
+                validate: (value) => {
+                  const texto = String(value ?? '').trim()
+                  if (!texto) return true
+                  if (!/^\d+(\.\d{1,2})?$/.test(texto)) return 'Monto con hasta 2 decimales'
+                  return true
+                },
+              })}
+              error={errors.total_ganado?.message}
             />
             <Input label="Correo electrónico" type="email" {...register('correo_electronico')} />
             <Input

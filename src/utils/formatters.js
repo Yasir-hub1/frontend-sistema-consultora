@@ -22,6 +22,26 @@ export const formatCurrency = (amount, showSymbol = true) => {
 }
 
 /**
+ * Bolivianos con separador de miles, a partir de un decimal ya redondeado ("1693.20").
+ */
+export const formatBolivianos = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return 'Bs. 0,00'
+  }
+  const raw = String(value).trim().replace(/\s/g, '').replace(',', '.')
+  if (!/^-?\d+(\.\d+)?$/.test(raw)) {
+    return 'Bs. 0,00'
+  }
+  const negative = raw.startsWith('-')
+  const unsigned = negative ? raw.slice(1) : raw
+  const [enteroRaw, fracRaw = ''] = unsigned.split('.')
+  const frac = `${fracRaw}00`.slice(0, 2)
+  const entero = enteroRaw.replace(/^0+(?=\d)/, '') || '0'
+  const withDots = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${negative ? '-' : ''}Bs. ${withDots},${frac}`
+}
+
+/**
  * Formatea un número con separadores de miles
  * @param {number} number - Número a formatear
  * @param {number} decimals - Número de decimales

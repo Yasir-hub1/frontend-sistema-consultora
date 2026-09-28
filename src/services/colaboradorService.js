@@ -226,6 +226,98 @@ export const colaboradorService = {
     }
   },
 
+  async listGestora(empresaClienteId, params = {}) {
+    try {
+      const queryParams = stripEmpty({
+        page: params.page || 1,
+        per_page: params.per_page || PAGINATION_CONFIG.DEFAULT_PAGE_SIZE,
+        search: params.search || '',
+        anio: params.anio,
+        mes: params.mes,
+      })
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/gestora`, queryParams)
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async generarAportesGestora(empresaClienteId, params = {}) {
+    try {
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/gestora/aportes`, {
+        anio: params.anio,
+        mes: params.mes,
+      })
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async fetchGestoraCartaPdf(empresaClienteId, params = {}) {
+    try {
+      const response = await api.get(
+        `/colaborador/empresas-cliente/${empresaClienteId}/gestora/aportes/pdf`,
+        {
+          params: { anio: params.anio, mes: params.mes },
+          responseType: 'blob',
+        }
+      )
+      const blob = response.data
+      if (blob instanceof Blob && blob.type?.includes('application/json')) {
+        try {
+          const j = JSON.parse(await blob.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      const cd = response.headers['content-disposition'] || ''
+      const match = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+      let nombre = `detalle_aportes_${params.anio}-${String(params.mes).padStart(2, '0')}.pdf`
+      if (match?.[1]) {
+        try {
+          nombre = decodeURIComponent(match[1].replace(/"/g, '').trim()) || nombre
+        } catch {
+          nombre = match[1].replace(/"/g, '').trim() || nombre
+        }
+      }
+      return { success: true, blob, nombre }
+    } catch (error) {
+      const data = error.response?.data
+      if (data instanceof Blob) {
+        try {
+          const j = JSON.parse(await data.text())
+          return { success: false, message: j.message || MESSAGES.ERROR_FETCH }
+        } catch {
+          return { success: false, message: MESSAGES.ERROR_FETCH }
+        }
+      }
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR_FETCH }
+    }
+  },
+
+  async actualizarGestora(empresaClienteId, personalId, payload) {
+    try {
+      const response = await patch(
+        `/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}/gestora`,
+        payload
+      )
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
+    }
+  },
+
   async getPersonal(empresaClienteId, personalId) {
     try {
       const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`)
@@ -503,9 +595,9 @@ export const colaboradorService = {
     }
   },
 
-  async listDeclaracionesMensuales(empresaClienteId) {
+  async listDeclaracionesMensuales(empresaClienteId, params = {}) {
     try {
-      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales`)
+      const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/declaraciones-mensuales`, params)
       if (response.data.success) {
         const raw = response.data.data
         return {

@@ -12,6 +12,7 @@ import {
   Landmark,
   Mail,
   Pencil,
+  Hash,
   Upload,
   User,
 } from 'lucide-react'
@@ -153,6 +154,7 @@ const PERSONA_FORM_EMPTY = {
   nombres: '',
   apellidos: '',
   ci: '',
+  numero_cua: '',
   correo_electronico: '',
   fecha_ingreso: '',
   cuenta_bancaria: '',
@@ -165,6 +167,7 @@ function personaDefaultsFromEmpleado(e) {
     nombres: e.nombres ?? '',
     apellidos: e.apellidos ?? '',
     ci: e.ci ?? '',
+    numero_cua: e.numero_cua ?? '',
     correo_electronico: e.correo_electronico ?? '',
     fecha_ingreso: isoToDateInput(e.fecha_ingreso),
     cuenta_bancaria: e.cuenta_bancaria ?? '',
@@ -595,6 +598,7 @@ export default function ColaboradorEmpleadoGestion() {
     payload.append('nombres', t(data.nombres))
     payload.append('apellidos', t(data.apellidos))
     payload.append('ci', t(data.ci))
+    payload.append('numero_cua', t(data.numero_cua))
     payload.append('correo_electronico', t(data.correo_electronico))
     payload.append('cargo', 'Personal')
     payload.append('fecha_ingreso', data.fecha_ingreso ? String(data.fecha_ingreso) : '')
@@ -937,6 +941,7 @@ export default function ColaboradorEmpleadoGestion() {
             <div className="mt-5 space-y-0 border-t border-gray-100 pt-4 dark:border-gray-800">
               {[
                 ['Carnet de identidad', empleado.ci ?? '—', CreditCard],
+                ['CUA / RUA', empleado.numero_cua ?? '—', Hash],
                 ['Empresa', empresaNombre, LayoutGrid],
                 ['Ingreso', formatFecha(empleado.fecha_ingreso), User],
                 ['Correo electrónico', empleado.correo_electronico ?? '—', Mail],
@@ -1271,6 +1276,22 @@ export default function ColaboradorEmpleadoGestion() {
               leftIcon={<CreditCard className="h-4 w-4" />}
               {...regPersona('ci', { required: 'Obligatorio' })}
               error={personaFs.errors.ci?.message}
+            />
+            <Input
+              label="Nro. CUA / RUA"
+              helperText="Código del asegurado en la Gestora. Opcional, solo números."
+              inputMode="numeric"
+              {...regPersona('numero_cua', {
+                validate: (value) => {
+                  const texto = String(value || '').trim()
+                  if (!texto) return true
+                  if (!/^[\d\s-]+$/.test(texto)) return 'Solo números'
+                  const digitos = texto.replace(/\D/g, '')
+                  if (digitos.length < 4 || digitos.length > 20) return 'Entre 4 y 20 dígitos'
+                  return true
+                },
+              })}
+              error={personaFs.errors.numero_cua?.message}
             />
             <Input label="Correo electrónico (legajo)" type="email" {...regPersona('correo_electronico')} />
             <Input

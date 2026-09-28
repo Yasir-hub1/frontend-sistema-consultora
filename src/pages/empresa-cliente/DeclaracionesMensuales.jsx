@@ -60,7 +60,7 @@ export default function EmpresaClienteDeclaracionesMensuales() {
       empresaClienteService.listDeclaracionesAguinaldo(),
     ])
     if (resMensual.success) {
-      const list = resMensual.data?.items ?? []
+      const list = (resMensual.data?.items ?? []).filter((item) => item.nombre_original)
       setItems(list)
       setQuickMesId((prev) => {
         if (prev && list.some((i) => String(i.id) === String(prev))) return prev

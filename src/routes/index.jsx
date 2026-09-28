@@ -136,6 +136,7 @@ const AppRoutes = () => {
           path="empresas/:empresaId/personal/:personalId"
           element={<ColaboradorEmpleado />}
         />
+        <Route path="reportes" element={<ConsultoraReportes modo="colaborador" />} />
         <Route path="tramites" element={<TramitesListaPage />} />
         <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
         <Route path="tramites/:id" element={<TramiteDetallePage />} />

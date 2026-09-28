@@ -6,6 +6,7 @@ import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Modal from '../../components/common/Modal'
 import { consultoraService } from '../../services/consultoraService'
+import { createReportesClient } from '../../services/reportesClient'
 
 function formatBytes(n) {
   if (n == null || Number.isNaN(Number(n))) return '—'
@@ -29,7 +30,11 @@ function etiquetaModuloReporte(r) {
   return String(r?.modulo || '—').toUpperCase()
 }
 
-export default function ConsultoraReportes() {
+export default function ConsultoraReportes({ modo = 'consultora' }) {
+  const reportes = useMemo(
+    () => createReportesClient(modo === 'colaborador' ? '/colaborador' : '/consultora'),
+    [modo]
+  )
   const [mesGestion, setMesGestion] = useState(new Date().toISOString().slice(0, 7))
   const [anioGestion, setAnioGestion] = useState(new Date().getFullYear())
   const [tipoDeclaracion, setTipoDeclaracion] = useState('todos')
@@ -51,7 +56,7 @@ export default function ConsultoraReportes() {
 
   const load = async () => {
     setLoading(true)
-    const res = await consultoraService.listReportesDeclaraciones({
+    const res = await reportes.listReportesDeclaraciones({
       mes_gestion:
         tipoDeclaracion === 'mensual' || tipoDeclaracion === 'otros_documentos' ? mesGestion : '',
       anio: tipoDeclaracion === 'aguinaldo' ? anioGestion : '',
@@ -75,7 +80,12 @@ export default function ConsultoraReportes() {
 
   useEffect(() => {
     const loadEmpresas = async () => {
-      const res = await consultoraService.listEmpresasClienteReporte()
+      const res = await reportes.listEmpresasClienteReporte()
+      if (modo === 'colaborador') {
+        setEmpresasCliente(res.success && Array.isArray(res.data) ? res.data : [])
+        if (!res.success) toast.error(res.message || 'No se pudo cargar empresas para el filtro.')
+        return
+      }
       if (res.success) {
         const fromReportes = Array.isArray(res.data) ? res.data : []
         // En algunos entornos un usuario de tipo consultora puede estar ligado por colaborador.
@@ -118,7 +128,7 @@ export default function ConsultoraReportes() {
       }
     }
     void loadEmpresas()
-  }, [])
+  }, [modo, reportes])
 
   const totalSize = useMemo(
     () => rows.reduce((acc, r) => acc + Number(r?.tamano_bytes || 0), 0),
@@ -127,7 +137,7 @@ export default function ConsultoraReportes() {
 
   const onPreview = async (row) => {
     setPreviewLoadingId(row.id)
-    const res = await consultoraService.fetchReporteDeclaracionPreviewBlob(row.id, rowTipo(row))
+    const res = await reportes.fetchReporteDeclaracionPreviewBlob(row.id, rowTipo(row))
     setPreviewLoadingId(null)
     if (!res.success || !res.blob) {
       toast.error(res.message || 'No se pudo abrir la vista previa.')
@@ -138,7 +148,7 @@ export default function ConsultoraReportes() {
   }
 
   const onDescargarDocumento = async (row) => {
-    const res = await consultoraService.descargarReporteDeclaracion(
+    const res = await reportes.descargarReporteDeclaracion(
       row.id,
       row.nombre_original,
       rowTipo(row)
@@ -162,7 +172,7 @@ export default function ConsultoraReportes() {
     }
     setResumenLoading(true)
     setResumenData(null)
-    const res = await consultoraService.getResumenAportesMensual({
+    const res = await reportes.getResumenAportesMensual({
       empresa_cliente_id: Number(empresaResumenId),
       mes_gestion: mesResumen,
     })
@@ -181,7 +191,7 @@ export default function ConsultoraReportes() {
       return
     }
     setResumenPdfLoading(true)
-    const res = await consultoraService.fetchResumenAportesPdfBlob({
+    const res = await reportes.fetchResumenAportesPdfBlob({
       empresa_cliente_id: Number(empresaResumenId),
       mes_gestion: mesResumen,
     })
@@ -205,7 +215,7 @@ export default function ConsultoraReportes() {
       return
     }
     setResumenPdfLoading(true)
-    const res = await consultoraService.fetchResumenAportesPdfBlob({
+    const res = await reportes.fetchResumenAportesPdfBlob({
       empresa_cliente_id: Number(empresaResumenId),
       mes_gestion: mesResumen,
     })
@@ -244,7 +254,7 @@ export default function ConsultoraReportes() {
       return
     }
     setExporting(true)
-    const res = await consultoraService.exportarReporteDeclaracionesPdf({
+    const res = await reportes.exportarReporteDeclaracionesPdf({
       mes_gestion: mesGestion,
       modulo: modulo || null,
     })
@@ -258,9 +268,9 @@ export default function ConsultoraReportes() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reportes</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Filtra declaraciones por mes y módulo (AFP, CAJA, Ministerio), aguinaldo y los PDF de otros documentos por
-          empresa que cargan los colaboradores; previsualiza y exporta PDF consolidado solo de mensuales. La carta de
-          aportes usa las declaraciones registradas.
+          {modo === 'colaborador'
+            ? 'Generá la carta de aportes y consultá las declaraciones de las empresas que tenés asignadas. La vista previa y la descarga usan el mismo PDF.'
+            : 'Filtra declaraciones por mes y módulo (AFP, CAJA, Ministerio), aguinaldo y los PDF de otros documentos por empresa que cargan los colaboradores; previsualiza y exporta PDF consolidado solo de mensuales. La carta de aportes usa las declaraciones registradas.'}
         </p>
       </div>
 
