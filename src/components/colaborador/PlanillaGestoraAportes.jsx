@@ -126,9 +126,9 @@ export default function PlanillaGestoraAportes({ planilla }) {
               <Encabezado tono="sip">Subtotal SIP</Encabezado>
               <Encabezado tono="solidario">Patronal 3,50%</Encabezado>
               <Encabezado tono="solidario">Asegurado 0,50%</Encabezado>
-              <Encabezado tono="solidario">Fondo 1%</Encabezado>
-              <Encabezado tono="solidario">Fondo 5%</Encabezado>
-              <Encabezado tono="solidario">Fondo 10%</Encabezado>
+              <Encabezado tono="solidario">Fondo 1,15%</Encabezado>
+              <Encabezado tono="solidario">Fondo 5,74%</Encabezado>
+              <Encabezado tono="solidario">Fondo 11,48%</Encabezado>
               <Encabezado tono="solidario">Subtotal</Encabezado>
             </tr>
           </thead>
@@ -234,9 +234,9 @@ export default function PlanillaGestoraAportes({ planilla }) {
                 <li>CNS = total ganado × 10%.</li>
                 <li>Gestora plana = total ganado × 19,92% (jubilación, riesgos, comisión, vivienda, patronal solidario y solidario del asegurado).</li>
                 <li>
-                  Aporte nacional solidario, solo si la diferencia es positiva: 1% × (total − 13.000) + 5% × (total − 25.000) + 10% × (total − 35.000).
+                  Aporte nacional solidario, solo si la diferencia es positiva: 1,15% × (total − 13.000) + 5,74% × (total − 25.000) + 11,48% × (total − 35.000).
                 </li>
-                <li>Ejemplo de Bs. 38.000: 250 + 650 + 300 = Bs. 1.200, además del 19,92%.</li>
+                <li>Ejemplo de Bs. 38.000: 287,50 + 746,20 + 344,40 = Bs. 1.378,10, además del 19,92%.</li>
               </ul>
             </div>
             <div className="rounded-xl border border-sky-200 bg-white px-4 py-3 dark:border-sky-900 dark:bg-gray-900">
