@@ -22,7 +22,7 @@ function valorPeriodo(anio, mes) {
   return `${anio}-${String(mes).padStart(2, '0')}`
 }
 
-export default function GestoraPersonalPanel({ empresaId, canEdit }) {
+export default function GestoraPersonalPanel({ empresaId, canEdit, version = 0, onEditarLegajo }) {
   const inicial = periodoInicial()
   const [anio, setAnio] = useState(inicial.anio)
   const [mes, setMes] = useState(inicial.mes)
@@ -74,7 +74,7 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
       toast.error(res.message || 'No se pudo cargar la gestora.')
     }
     setLoading(false)
-  }, [empresaId, page, perPage, search, anio, mes])
+  }, [empresaId, page, perPage, search, anio, mes, version])
 
   useEffect(() => {
     load()
@@ -126,7 +126,7 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
       toast.error(res.message || 'No se pudo guardar.')
       return
     }
-    toast.success('Datos de gestora actualizados.')
+    toast.success('Días y total del mes actualizados.')
     setEditRow(null)
     await load()
   }
@@ -265,7 +265,7 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
         </div>
 
         <p className="mb-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-          Cargá el total ganado del mes. Los aportes se calculan sobre ese monto, no sobre los días. Deshabilitar saca a la persona solo de la planilla de este periodo. Generar aportes incluye a todo el personal habilitado del mes, no solo la página visible.
+          <strong className="font-semibold text-gray-700 dark:text-gray-200">Editar</strong> cambia el legajo: nombre, carnet, CUA/RUA y archivos. <strong className="font-semibold text-gray-700 dark:text-gray-200">Este mes</strong> guarda solo los días y el total ganado de {etiqueta || 'este periodo'}. Deshabilitar saca a la persona de la planilla de ese mes.
         </p>
 
         <GestoraDeclaracionesMes empresaId={empresaId} anio={anio} mes={mes} />
@@ -308,9 +308,12 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
                     </p>
                   ) : null}
                   {canEdit ? (
-                    <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-                      <Button type="button" size="sm" variant="secondary" className="flex-1" icon={<Pencil className="h-4 w-4" />} onClick={() => abrirEdicion(row)}>
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <Button type="button" size="sm" variant="secondary" className="flex-1" icon={<Pencil className="h-4 w-4" />} onClick={() => onEditarLegajo?.(row.id)}>
                         Editar
+                      </Button>
+                      <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => abrirEdicion(row)}>
+                        Este mes
                       </Button>
                       <Button
                         type="button"
@@ -357,9 +360,6 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
                         {!row.habilitado ? (
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">Fuera de planilla</p>
                         ) : null}
-                        {Number(row.total_ganado) <= 0 ? (
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">Falta total ganado</p>
-                        ) : null}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-600 dark:text-gray-300">{row.numero_cua || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-600 dark:text-gray-300">{row.dias_trabajados}</td>
@@ -368,13 +368,20 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         {canEdit ? (
-                          <div className="inline-flex items-center gap-3">
+                          <div className="inline-flex flex-wrap items-center justify-end gap-3">
                             <button
                               type="button"
                               className="text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                              onClick={() => abrirEdicion(row)}
+                              onClick={() => onEditarLegajo?.(row.id)}
                             >
                               Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="text-sm font-semibold text-gray-700 hover:text-gray-900 dark:text-gray-200"
+                              onClick={() => abrirEdicion(row)}
+                            >
+                              Este mes
                             </button>
                             <button
                               type="button"
@@ -405,7 +412,7 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
       <Modal
         isOpen={editRow != null}
         onClose={() => setEditRow(null)}
-        title={editRow ? `Editar ${editRow.nombre}` : 'Editar'}
+        title={editRow ? `Este mes · ${editRow.nombre}` : 'Este mes'}
         size="md"
         bodyClassName="p-4 sm:p-6"
       >
@@ -417,15 +424,8 @@ export default function GestoraPersonalPanel({ empresaId, canEdit }) {
           }}
         >
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Estos días y el total ganado quedan guardados para {etiqueta || 'el periodo'}. El CUA/RUA es del legajo, no cambia con el mes.
+            Días trabajados y total ganado de {etiqueta || 'este periodo'}. No cambian el nombre ni los archivos del legajo. El mes siguiente empieza de nuevo.
           </p>
-          <Input
-            label="Nro. CUA / RUA"
-            value={draft.numero_cua}
-            onChange={(e) => setDraft((prev) => ({ ...prev, numero_cua: e.target.value }))}
-            inputMode="numeric"
-            helperText="Opcional. Solo dígitos, entre 4 y 20."
-          />
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
               label="Días trabajados"

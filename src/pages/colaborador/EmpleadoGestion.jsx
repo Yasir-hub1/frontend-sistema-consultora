@@ -587,11 +587,6 @@ export default function ColaboradorEmpleadoGestion() {
     setSavingPersona(true)
     setMsg(null)
     const contactos = contactosReferencia.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3)
-    if (contactos.length < 2) {
-      setSavingPersona(false)
-      toast.error('Indica al menos 2 contactos de referencia.')
-      return
-    }
     const payload = new FormData()
     const t = (v) => (v == null ? '' : String(v)).trim()
 
@@ -891,7 +886,7 @@ export default function ColaboradorEmpleadoGestion() {
                           setContactosReferencia(
                             (empleado.contactos_referencia ?? []).slice(0, 3).length
                               ? (empleado.contactos_referencia ?? []).slice(0, 3)
-                              : ['', '']
+                              : ['']
                           )
                           setEditPersonaOpen(true)
                         }}
@@ -1302,7 +1297,7 @@ export default function ColaboradorEmpleadoGestion() {
             <Input label="Fecha de ingreso" type="date" {...regPersona('fecha_ingreso', { required: 'Obligatorio' })} />
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Contactos de referencia (mín. 2, máx. 3)
+                Contactos de referencia (opcional, máx. 3)
               </label>
               <div className="space-y-2">
                 {contactosReferencia.map((valor, idx) => (

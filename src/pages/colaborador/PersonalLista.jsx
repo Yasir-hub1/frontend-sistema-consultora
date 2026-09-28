@@ -270,6 +270,19 @@ function anioGestionActual() {
   return new Date().getFullYear()
 }
 
+function NotaArchivoExistente({ nombre, onVer }) {
+  if (!nombre) return null
+  return (
+    <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+      Ya cargado: {nombre}.{' '}
+      <button type="button" className="font-semibold text-primary-600 hover:underline dark:text-primary-400" onClick={onVer}>
+        Ver
+      </button>
+      . Elegí otro archivo solo si querés reemplazarlo.
+    </p>
+  )
+}
+
 export default function ColaboradorPersonalLista() {
   const { user } = useAuth()
   const { empresaId } = useParams()
@@ -289,7 +302,7 @@ export default function ColaboradorPersonalLista() {
   const [uploadingPlantilla, setUploadingPlantilla] = useState(false)
   const [archivoMasivo, setArchivoMasivo] = useState(null)
   const [resumenMasivo, setResumenMasivo] = useState(null)
-  const [contactosReferencia, setContactosReferencia] = useState(['', ''])
+  const [contactosReferencia, setContactosReferencia] = useState([''])
   const [curriculumFile, setCurriculumFile] = useState(null)
   const [licenciaFile, setLicenciaFile] = useState(null)
   const [avisoFile, setAvisoFile] = useState(null)
@@ -300,6 +313,9 @@ export default function ColaboradorPersonalLista() {
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [pestana, setPestana] = useState('gestora')
+  const [gestoraVersion, setGestoraVersion] = useState(0)
+  const [legajoId, setLegajoId] = useState(null)
+  const [legajoArchivos, setLegajoArchivos] = useState(null)
   const [total, setTotal] = useState(0)
   const [lastPage, setLastPage] = useState(1)
 
@@ -721,8 +737,6 @@ export default function ColaboradorPersonalLista() {
       apellidos: '',
       ci: '',
       numero_cua: '',
-      dias_trabajados: '',
-      total_ganado: '',
       correo_electronico: '',
       cuenta_bancaria: '',
       fecha_ingreso: new Date().toISOString().slice(0, 10),
@@ -745,16 +759,93 @@ export default function ColaboradorPersonalLista() {
     })
   }
 
-  const closeModal = () => {
-    setModalOpen(false)
-    reset()
-    setContactosReferencia(['', ''])
+  const limpiarArchivosLegajo = () => {
     setCurriculumFile(null)
     setLicenciaFile(null)
     setAvisoFile(null)
     setCroquisFile(null)
     setCertNacimientoFile(null)
+  }
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setLegajoId(null)
+    setLegajoArchivos(null)
+    reset()
+    setContactosReferencia([''])
+    limpiarArchivosLegajo()
     closeRegistroLegajoPreview()
+  }
+
+  const abrirAlta = () => {
+    setMsg(null)
+    setLegajoId(null)
+    setLegajoArchivos(null)
+    reset({
+      nombres: '',
+      apellidos: '',
+      ci: '',
+      numero_cua: '',
+      correo_electronico: '',
+      cuenta_bancaria: '',
+      fecha_ingreso: new Date().toISOString().slice(0, 10),
+    })
+    setContactosReferencia([''])
+    limpiarArchivosLegajo()
+    closeRegistroLegajoPreview()
+    setModalOpen(true)
+  }
+
+  const abrirEdicionLegajo = async (personalId) => {
+    setMsg(null)
+    const res = await colaboradorService.getPersonal(empresaId, personalId)
+    if (!res.success || !res.data) {
+      toast.error(res.message || 'No se pudo abrir el legajo.')
+      return
+    }
+    const persona = res.data
+    const contactos = Array.isArray(persona.contactos_referencia)
+      ? persona.contactos_referencia.map((item) => String(item || '')).filter(Boolean).slice(0, 3)
+      : []
+    reset({
+      nombres: persona.nombres || '',
+      apellidos: persona.apellidos || '',
+      ci: persona.ci || '',
+      numero_cua: persona.numero_cua || '',
+      correo_electronico: persona.correo_electronico || '',
+      cuenta_bancaria: persona.cuenta_bancaria || '',
+      fecha_ingreso: String(persona.fecha_ingreso || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+    })
+    setContactosReferencia(contactos.length > 0 ? contactos : [''])
+    limpiarArchivosLegajo()
+    closeRegistroLegajoPreview()
+    setLegajoArchivos({
+      curriculum: persona.curriculum_archivo_nombre || '',
+      licencia: persona.licencia_conducir_archivo_nombre || '',
+      aviso: persona.aviso_luz_agua_archivo_nombre || '',
+      croquis: persona.croquis_archivo_nombre || '',
+      certificado: persona.certificado_nacimiento_archivo_nombre || '',
+    })
+    setLegajoId(persona.id)
+    setModalOpen(true)
+  }
+
+  const verArchivoGuardado = async (tipo, title) => {
+    if (!legajoId) return
+    const res = await colaboradorService.fetchLegajoArchivoBlob(empresaId, legajoId, tipo)
+    if (!res.success || !res.blob) {
+      toast.error(res.message || 'No se pudo abrir el archivo.')
+      return
+    }
+    const mime = String(res.mime || res.blob.type || '')
+    setRegistroLegajoPreview((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url)
+      return {
+        url: URL.createObjectURL(res.blob),
+        kind: mime.startsWith('image/') ? 'image' : 'pdf',
+        title,
+      }
+    })
   }
 
   const descargarPlantillaMasiva = async () => {
@@ -787,6 +878,7 @@ export default function ColaboradorPersonalLista() {
       })
       setMsg(res.message || 'Carga masiva completada.')
       setArchivoMasivo(null)
+      setGestoraVersion((version) => version + 1)
     } else {
       setMsg(res.message || 'No se pudo procesar la plantilla.')
     }
@@ -795,10 +887,6 @@ export default function ColaboradorPersonalLista() {
   const onCreate = async (data) => {
     setMsg(null)
     const contactos = contactosReferencia.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3)
-    if (contactos.length < 2) {
-      setMsg('Debes registrar al menos 2 datos de contacto.')
-      return
-    }
     const legajoPdfFiles = [curriculumFile, avisoFile, croquisFile, licenciaFile].filter(Boolean)
     if (legajoPdfFiles.some((f) => !isPdfFile(f))) {
       setMsg('Solo se permiten archivos PDF en curriculum, licencia, avisos y croquis.')
@@ -812,13 +900,11 @@ export default function ColaboradorPersonalLista() {
     fd.append('nombres', data.nombres)
     fd.append('apellidos', data.apellidos)
     fd.append('ci', data.ci)
-    if (String(data.numero_cua || '').trim()) fd.append('numero_cua', String(data.numero_cua).trim())
-    if (String(data.dias_trabajados ?? '').trim() !== '') fd.append('dias_trabajados', String(data.dias_trabajados).trim())
-    if (String(data.total_ganado ?? '').trim() !== '') fd.append('total_ganado', String(data.total_ganado).trim())
+    fd.append('numero_cua', String(data.numero_cua || '').trim())
     fd.append('cargo', 'Personal')
     fd.append('fecha_ingreso', data.fecha_ingreso)
-    if (data.correo_electronico) fd.append('correo_electronico', data.correo_electronico)
-    if (data.cuenta_bancaria) fd.append('cuenta_bancaria', data.cuenta_bancaria)
+    fd.append('correo_electronico', data.correo_electronico || '')
+    fd.append('cuenta_bancaria', data.cuenta_bancaria || '')
     fd.append('contactos_referencia', JSON.stringify(contactos))
     if (curriculumFile) fd.append('curriculum_archivo', curriculumFile)
     if (licenciaFile) fd.append('licencia_conducir_archivo', licenciaFile)
@@ -826,12 +912,18 @@ export default function ColaboradorPersonalLista() {
     if (croquisFile) fd.append('croquis_archivo', croquisFile)
     if (certNacimientoFile) fd.append('certificado_nacimiento_archivo', certNacimientoFile)
 
-    const res = await colaboradorService.createPersonal(empresaId, fd)
+    const res = legajoId
+      ? await colaboradorService.updatePersonal(empresaId, legajoId, fd)
+      : await colaboradorService.createPersonal(empresaId, fd)
     if (res.success) {
+      const eraEdicion = Boolean(legajoId)
       closeModal()
       await load()
+      setGestoraVersion((version) => version + 1)
       setMsg(
-        'Personal registrado. Podés completar curriculum, avisos y demás documentos del legajo cuando los tengas; también en AFP, CAJA y Ministerio.'
+        eraEdicion
+          ? 'Datos del personal actualizados.'
+          : 'Personal registrado. Podés completar curriculum, avisos y demás documentos del legajo cuando los tengas; también en AFP, CAJA y Ministerio.'
       )
     } else setMsg(res.message)
   }
@@ -901,10 +993,7 @@ export default function ColaboradorPersonalLista() {
             </Button>
             <Button
               type="button"
-              onClick={() => {
-                setMsg(null)
-                setModalOpen(true)
-              }}
+              onClick={abrirAlta}
               icon={<UserPlus className="h-4 w-4" />}
               className="w-full sm:w-auto"
             >
@@ -985,7 +1074,12 @@ export default function ColaboradorPersonalLista() {
       </div>
 
       {pestana === 'gestora' ? (
-        <GestoraPersonalPanel empresaId={empresaId} canEdit={canEditarLegajo} />
+        <GestoraPersonalPanel
+          empresaId={empresaId}
+          canEdit={canEditarLegajo}
+          version={gestoraVersion}
+          onEditarLegajo={abrirEdicionLegajo}
+        />
       ) : (
       <Card title="Directorio de personal" subtitle={rangeLabel} gradient>
         <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1074,7 +1168,7 @@ export default function ColaboradorPersonalLista() {
               Crea el primer legajo para habilitar los módulos AFP, CAJA y Ministerio de Trabajo.
             </p>
             {canRegistrarPersonal ? (
-              <Button type="button" className="mt-5" onClick={() => setModalOpen(true)} icon={<Plus className="h-4 w-4" />}>
+              <Button type="button" className="mt-5" onClick={abrirAlta} icon={<Plus className="h-4 w-4" />}>
                 Registrar empleado
               </Button>
             ) : null}
@@ -1909,11 +2003,9 @@ export default function ColaboradorPersonalLista() {
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
             <p className="text-sm font-semibold text-gray-900 dark:text-white">Columnas</p>
             <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-              NOMBRES, APELLIDOS, CI, NRO_CUA (CUA/RUA, opcional, solo dígitos), DIAS_TRABAJADOS opcional (0 a 31),
-              TOTAL_GANADO opcional (por ejemplo 8500.00), FECHA_NACIMIENTO(YYYY-MM-DD) opcional, FECHA_INGRESO(YYYY-MM-DD),
-              CARGO opcional, CORREO_ELECTRONICO opcional, CUENTA_BANCARIA opcional, CONTACTO_REFERENCIA_1,
-              CONTACTO_REFERENCIA_2, CONTACTO_REFERENCIA_3 opcional (mínimo 2 contactos con datos entre las tres columnas).
-              Días y total ganado quedan en el mes de la fecha de ingreso.
+              NOMBRES, APELLIDOS, CI, NRO_CUA (CUA/RUA, opcional, solo dígitos), FECHA_NACIMIENTO(YYYY-MM-DD) opcional,
+              FECHA_INGRESO(YYYY-MM-DD), CARGO opcional, CORREO_ELECTRONICO opcional, CUENTA_BANCARIA opcional,
+              CONTACTO_REFERENCIA_1, CONTACTO_REFERENCIA_2 y CONTACTO_REFERENCIA_3 opcionales.
             </p>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/30">
@@ -1974,7 +2066,7 @@ export default function ColaboradorPersonalLista() {
       <Modal
         isOpen={modalOpen}
         onClose={closeModal}
-        title="Registrar personal"
+        title={legajoId ? 'Editar personal' : 'Registrar personal'}
         size="lg"
         overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
         className="animate-scale-in rounded-2xl motion-reduce:animate-none"
@@ -1982,8 +2074,9 @@ export default function ColaboradorPersonalLista() {
       >
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Registrá el legajo base. Curriculum, avisos, croquis y certificado de nacimiento son opcionales; podés
-            subirlos ahora o después desde el detalle del empleado. La licencia de conducir sigue siendo opcional.
+            {legajoId
+              ? 'Estos son los datos del legajo: nombre, carnet, CUA/RUA, contactos y archivos. Los días trabajados y el total ganado se cargan aparte, en cada mes de Gestora.'
+              : 'Registrá el legajo base. Curriculum, avisos, croquis y certificado de nacimiento son opcionales; podés subirlos ahora o después. La licencia de conducir sigue siendo opcional.'}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nombres" {...register('nombres', { required: 'Obligatorio' })} />
@@ -2009,42 +2102,6 @@ export default function ColaboradorPersonalLista() {
               })}
               error={errors.numero_cua?.message}
             />
-            <Input
-              label="Días trabajados"
-              type="number"
-              min="0"
-              max="31"
-              step="1"
-              inputMode="numeric"
-              helperText="Opcional. Se guarda en el mes de la fecha de ingreso. Vacío usa 30 en Gestora."
-              {...register('dias_trabajados', {
-                validate: (value) => {
-                  const texto = String(value ?? '').trim()
-                  if (!texto) return true
-                  if (!/^\d+$/.test(texto)) return 'Entero entre 0 y 31'
-                  if (Number(texto) > 31) return 'Entre 0 y 31'
-                  return true
-                },
-              })}
-              error={errors.dias_trabajados?.message}
-            />
-            <Input
-              label="Total ganado"
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              helperText="Opcional. Bolivianos del mes de ingreso, por ejemplo 8500.00."
-              {...register('total_ganado', {
-                validate: (value) => {
-                  const texto = String(value ?? '').trim()
-                  if (!texto) return true
-                  if (!/^\d+(\.\d{1,2})?$/.test(texto)) return 'Monto con hasta 2 decimales'
-                  return true
-                },
-              })}
-              error={errors.total_ganado?.message}
-            />
             <Input label="Correo electrónico" type="email" {...register('correo_electronico')} />
             <Input
               label="Cuenta bancaria"
@@ -2054,7 +2111,7 @@ export default function ColaboradorPersonalLista() {
             <Input label="Fecha ingreso" type="date" {...register('fecha_ingreso', { required: 'Obligatorio' })} />
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Contactos de referencia (mín. 2, máx. 3)
+                Contactos de referencia (opcional, máx. 3)
               </label>
               <div className="space-y-2">
                 {contactosReferencia.map((valor, idx) => (
@@ -2108,6 +2165,9 @@ export default function ColaboradorPersonalLista() {
                     </Button>
                   ) : null}
                 </div>
+                {legajoId && !curriculumFile ? (
+                  <NotaArchivoExistente nombre={legajoArchivos?.curriculum} onVer={() => void verArchivoGuardado('curriculum', 'Curriculum')} />
+                ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2133,6 +2193,9 @@ export default function ColaboradorPersonalLista() {
                     </Button>
                   ) : null}
                 </div>
+                {legajoId && !licenciaFile ? (
+                  <NotaArchivoExistente nombre={legajoArchivos?.licencia} onVer={() => void verArchivoGuardado('licencia', 'Licencia de conducir')} />
+                ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2158,6 +2221,9 @@ export default function ColaboradorPersonalLista() {
                     </Button>
                   ) : null}
                 </div>
+                {legajoId && !avisoFile ? (
+                  <NotaArchivoExistente nombre={legajoArchivos?.aviso} onVer={() => void verArchivoGuardado('aviso', 'Aviso luz/agua')} />
+                ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2183,6 +2249,9 @@ export default function ColaboradorPersonalLista() {
                     </Button>
                   ) : null}
                 </div>
+                {legajoId && !croquisFile ? (
+                  <NotaArchivoExistente nombre={legajoArchivos?.croquis} onVer={() => void verArchivoGuardado('croquis', 'Croquis')} />
+                ) : null}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2208,6 +2277,12 @@ export default function ColaboradorPersonalLista() {
                     </Button>
                   ) : null}
                 </div>
+                {legajoId && !certNacimientoFile ? (
+                  <NotaArchivoExistente
+                    nombre={legajoArchivos?.certificado}
+                    onVer={() => void verArchivoGuardado('certificado_nacimiento', 'Certificado de nacimiento')}
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -2216,7 +2291,7 @@ export default function ColaboradorPersonalLista() {
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting} icon={<UserPlus className="h-4 w-4" />}>
-              {isSubmitting ? 'Guardando…' : 'Guardar personal'}
+              {isSubmitting ? 'Guardando…' : legajoId ? 'Guardar cambios' : 'Guardar personal'}
             </Button>
           </div>
         </form>
