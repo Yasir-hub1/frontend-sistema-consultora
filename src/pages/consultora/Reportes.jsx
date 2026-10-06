@@ -1,604 +1,114 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye, FileText, Building2, RefreshCw } from 'lucide-react'
-import toast from 'react-hot-toast'
-import Card from '../../components/common/Card'
-import Button from '../../components/common/Button'
-import Input from '../../components/common/Input'
-import Modal from '../../components/common/Modal'
-import { consultoraService } from '../../services/consultoraService'
+import { useId, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { clsx } from 'clsx'
+import { FileStack, Mail } from 'lucide-react'
+import CartaAportesMes from '../../components/reportes/CartaAportesMes'
+import DocumentosReporte from '../../components/reportes/DocumentosReporte'
+import { useEmpresasReporte } from '../../hooks/useEmpresasReporte'
 import { createReportesClient } from '../../services/reportesClient'
 
-function formatBytes(n) {
-  if (n == null || Number.isNaN(Number(n))) return '—'
-  const v = Number(n)
-  if (v < 1024) return `${v} B`
-  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`
-  return `${(v / (1024 * 1024)).toFixed(1)} MB`
-}
+const VISTA_CARTA = 'carta'
+const VISTA_DOCUMENTOS = 'documentos'
 
-function rowTipo(r) {
-  const t = r?.tipo_declaracion ? String(r.tipo_declaracion) : ''
-  if (t === 'otros_documentos') return 'otros_documentos'
-  if (t) return t
-  if (String(r?.modulo || '').toLowerCase() === 'aguinaldo') return 'aguinaldo'
-  return 'mensual'
-}
+const VISTAS = [
+  {
+    id: VISTA_CARTA,
+    etiqueta: 'Carta de aportes',
+    icono: Mail,
+    descripcion: 'Montos a pagar de una empresa en un mes y la carta en PDF para enviarle.',
+  },
+  {
+    id: VISTA_DOCUMENTOS,
+    etiqueta: 'Documentos cargados',
+    icono: FileStack,
+    descripcion: 'Declaraciones mensuales y otros PDFs que cargaron los colaboradores, por empresa y mes.',
+  },
+]
 
-function etiquetaModuloReporte(r) {
-  const mod = String(r?.modulo || '').toLowerCase()
-  if (mod === 'otros_documentos') return 'Otros doc. empresa'
-  return String(r?.modulo || '—').toUpperCase()
+function SelectorVista({ activa, onCambiar, idBase }) {
+  return (
+    <div role="tablist" aria-label="Sección de reportes" className="grid gap-2 sm:grid-cols-2">
+      {VISTAS.map((v) => {
+        const seleccionada = v.id === activa
+        const Icono = v.icono
+        return (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            id={`${idBase}-tab-${v.id}`}
+            aria-selected={seleccionada}
+            aria-controls={`${idBase}-panel-${v.id}`}
+            onClick={() => onCambiar(v.id)}
+            className={clsx(
+              'flex items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900',
+              seleccionada
+                ? 'border-primary-300 bg-white shadow-sm ring-1 ring-primary-200 dark:border-primary-700 dark:bg-gray-900 dark:ring-primary-800'
+                : 'border-gray-200 bg-white/60 hover:border-gray-300 hover:bg-white dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-900/60'
+            )}
+          >
+            <span
+              className={clsx(
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                seleccionada ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+              )}
+            >
+              <Icono aria-hidden="true" className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0">
+              <span className={clsx('block font-semibold', seleccionada ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300')}>
+                {v.etiqueta}
+              </span>
+              <span className="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">{v.descripcion}</span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function ConsultoraReportes({ modo = 'consultora' }) {
-  const reportes = useMemo(
-    () => createReportesClient(modo === 'colaborador' ? '/colaborador' : '/consultora'),
-    [modo]
-  )
-  const [mesGestion, setMesGestion] = useState(new Date().toISOString().slice(0, 7))
-  const [anioGestion, setAnioGestion] = useState(new Date().getFullYear())
-  const [tipoDeclaracion, setTipoDeclaracion] = useState('todos')
-  const [empresaFiltroId, setEmpresaFiltroId] = useState('')
-  const [modulo, setModulo] = useState('')
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [preview, setPreview] = useState(null)
-  const [previewLoadingId, setPreviewLoadingId] = useState(null)
-  const [exporting, setExporting] = useState(false)
+  const idBase = useId()
+  const reportes = useMemo(() => createReportesClient(modo === 'colaborador' ? '/colaborador' : '/consultora'), [modo])
+  const empresas = useEmpresasReporte(reportes, modo)
+  const [params, setParams] = useSearchParams()
+  const vista = params.get('vista') === VISTA_DOCUMENTOS ? VISTA_DOCUMENTOS : VISTA_CARTA
 
-  const [empresasCliente, setEmpresasCliente] = useState([])
-  const [empresaResumenId, setEmpresaResumenId] = useState('')
-  const [mesResumen, setMesResumen] = useState(new Date().toISOString().slice(0, 7))
-  const [resumenData, setResumenData] = useState(null)
-  const [resumenLoading, setResumenLoading] = useState(false)
-  const [resumenPdfLoading, setResumenPdfLoading] = useState(false)
-  const [resumenPreview, setResumenPreview] = useState(null)
-
-  const load = async () => {
-    setLoading(true)
-    const res = await reportes.listReportesDeclaraciones({
-      mes_gestion:
-        tipoDeclaracion === 'mensual' || tipoDeclaracion === 'otros_documentos' ? mesGestion : '',
-      anio: tipoDeclaracion === 'aguinaldo' ? anioGestion : '',
-      modulo: tipoDeclaracion === 'mensual' ? modulo : '',
-      tipo_declaracion: tipoDeclaracion,
-      empresa_cliente_id: empresaFiltroId ? Number(empresaFiltroId) : null,
-      per_page: 200,
-    })
-    setLoading(false)
-    if (res.success) setRows(res.data?.data ?? [])
-    else {
-      setRows([])
-      toast.error(res.message || 'No se pudo cargar el reporte.')
-    }
-  }
-
-  useEffect(() => {
-    void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    const loadEmpresas = async () => {
-      const res = await reportes.listEmpresasClienteReporte()
-      if (modo === 'colaborador') {
-        setEmpresasCliente(res.success && Array.isArray(res.data) ? res.data : [])
-        if (!res.success) toast.error(res.message || 'No se pudo cargar empresas para el filtro.')
-        return
-      }
-      if (res.success) {
-        const fromReportes = Array.isArray(res.data) ? res.data : []
-        // En algunos entornos un usuario de tipo consultora puede estar ligado por colaborador.
-        // Mergeamos con el listado paginado para evitar perder empresas en el selector.
-        const merged = [...fromReportes]
-        const seen = new Set(fromReportes.map((e) => Number(e.id)))
-        let page = 1
-        let lastPage = 1
-        do {
-          const r = await consultoraService.listEmpresasCliente({ per_page: 100, page })
-          if (!r.success) break
-          const chunk = r.data?.data ?? []
-          chunk.forEach((e) => {
-            const id = Number(e.id)
-            if (!seen.has(id)) {
-              seen.add(id)
-              merged.push(e)
-            }
-          })
-          lastPage = r.data?.last_page ?? 1
-          page += 1
-        } while (page <= lastPage)
-        setEmpresasCliente(merged)
-        return
-      }
-      const acc = []
-      let page = 1
-      let lastPage = 1
-      do {
-        const r = await consultoraService.listEmpresasCliente({ per_page: 100, page })
-        if (!r.success) break
-        const chunk = r.data?.data ?? []
-        acc.push(...chunk)
-        lastPage = r.data?.last_page ?? 1
-        page += 1
-      } while (page <= lastPage)
-      setEmpresasCliente(acc)
-      if (acc.length === 0) {
-        toast.error(res.message || 'No se pudo cargar empresas para el filtro.')
-      }
-    }
-    void loadEmpresas()
-  }, [modo, reportes])
-
-  const totalSize = useMemo(
-    () => rows.reduce((acc, r) => acc + Number(r?.tamano_bytes || 0), 0),
-    [rows]
-  )
-
-  const onPreview = async (row) => {
-    setPreviewLoadingId(row.id)
-    const res = await reportes.fetchReporteDeclaracionPreviewBlob(row.id, rowTipo(row))
-    setPreviewLoadingId(null)
-    if (!res.success || !res.blob) {
-      toast.error(res.message || 'No se pudo abrir la vista previa.')
-      return
-    }
-    const url = URL.createObjectURL(res.blob)
-    setPreview({ id: row.id, title: row.nombre_original, url })
-  }
-
-  const onDescargarDocumento = async (row) => {
-    const res = await reportes.descargarReporteDeclaracion(
-      row.id,
-      row.nombre_original,
-      rowTipo(row)
+  const cambiarVista = (id) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (id === VISTA_CARTA) next.delete('vista')
+        else next.set('vista', id)
+        return next
+      },
+      { replace: true }
     )
-    if (!res?.success) {
-      toast.error(res?.message || 'No se pudo descargar el documento.')
-      return
-    }
-    toast.success('Descarga iniciada.')
-  }
-
-  const onClosePreview = () => {
-    if (preview?.url) URL.revokeObjectURL(preview.url)
-    setPreview(null)
-  }
-
-  const onConsultarResumen = async () => {
-    if (!empresaResumenId || !mesResumen) {
-      toast.error('Selecciona empresa y mes.')
-      return
-    }
-    setResumenLoading(true)
-    setResumenData(null)
-    const res = await reportes.getResumenAportesMensual({
-      empresa_cliente_id: Number(empresaResumenId),
-      mes_gestion: mesResumen,
-    })
-    setResumenLoading(false)
-    if (!res.success) {
-      toast.error(res.message || 'No se pudo cargar el resumen.')
-      return
-    }
-    setResumenData(res.data)
-    toast.success('Datos del periodo cargados.')
-  }
-
-  const onResumenPdfPreview = async () => {
-    if (!empresaResumenId || !mesResumen) {
-      toast.error('Selecciona empresa y mes.')
-      return
-    }
-    setResumenPdfLoading(true)
-    const res = await reportes.fetchResumenAportesPdfBlob({
-      empresa_cliente_id: Number(empresaResumenId),
-      mes_gestion: mesResumen,
-    })
-    setResumenPdfLoading(false)
-    if (!res.success || !res.blob) {
-      toast.error(res.message || 'No se pudo generar el PDF.')
-      return
-    }
-    const url = URL.createObjectURL(res.blob)
-    setResumenPreview({ url, title: `Resumen aportes ${mesResumen}` })
-  }
-
-  const onCloseResumenPreview = () => {
-    if (resumenPreview?.url) URL.revokeObjectURL(resumenPreview.url)
-    setResumenPreview(null)
-  }
-
-  const onDescargarResumenPdf = async () => {
-    if (!empresaResumenId || !mesResumen) {
-      toast.error('Selecciona empresa y mes.')
-      return
-    }
-    setResumenPdfLoading(true)
-    const res = await reportes.fetchResumenAportesPdfBlob({
-      empresa_cliente_id: Number(empresaResumenId),
-      mes_gestion: mesResumen,
-    })
-    setResumenPdfLoading(false)
-    if (!res.success || !res.blob) {
-      toast.error(res.message || 'No se pudo descargar el PDF.')
-      return
-    }
-    const nombre =
-      resumenData?.empresa_cliente?.nombre ||
-      resumenData?.empresa_cliente?.razon_social ||
-      'empresa'
-    const safe = String(nombre)
-      .replace(/[^\w\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '_')
-      .slice(0, 40)
-    const downloadUrl = window.URL.createObjectURL(res.blob)
-    const link = document.createElement('a')
-    link.href = downloadUrl
-    link.download = `resumen_aportes_${safe}_${mesResumen}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(downloadUrl)
-    toast.success('PDF descargado.')
-  }
-
-  const onExportPdf = async () => {
-    if (tipoDeclaracion !== 'mensual') {
-      toast.error('La exportación consolidada aplica solo a declaraciones mensuales.')
-      return
-    }
-    if (!mesGestion) {
-      toast.error('Selecciona un mes.')
-      return
-    }
-    setExporting(true)
-    const res = await reportes.exportarReporteDeclaracionesPdf({
-      mes_gestion: mesGestion,
-      modulo: modulo || null,
-    })
-    setExporting(false)
-    if (!res.success) toast.error(res.message || 'No se pudo exportar el PDF consolidado.')
-    else toast.success('Reporte PDF generado.')
-  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reportes</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {modo === 'colaborador'
-            ? 'Generá la carta de aportes y consultá las declaraciones de las empresas que tenés asignadas. La vista previa y la descarga usan el mismo PDF.'
-            : 'Filtra declaraciones por mes y módulo (AFP, CAJA, Ministerio), aguinaldo y los PDF de otros documentos por empresa que cargan los colaboradores; previsualiza y exporta PDF consolidado solo de mensuales. La carta de aportes usa las declaraciones registradas.'}
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Reportes</h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          {modo === 'colaborador' ? 'De las empresas que tenés asignadas.' : 'De todas las empresas cliente de tu consultora.'}
         </p>
-      </div>
+      </header>
 
-      <Card
-        title="Resumen mensual de aportes (carta)"
-        subtitle="Consolida montos de todas las declaraciones del periodo (AFP, CAJA, Ministerio) y descarga el PDF tipo carta"
-        gradient
-      >
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-2 lg:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Empresa cliente</label>
-            <select
-              value={empresaResumenId}
-              onChange={(e) => {
-                setEmpresaResumenId(e.target.value)
-                setResumenData(null)
-              }}
-              className="input w-full py-2.5"
-            >
-              <option value="">Seleccionar…</option>
-              {empresasCliente.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre || e.razon_social || `Empresa #${e.id}`}
-                  {e.nit ? ` · ${e.nit}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Input
-            label="Mes"
-            type="month"
-            value={mesResumen}
-            onChange={(e) => {
-              setMesResumen(e.target.value)
-              setResumenData(null)
-            }}
-          />
-          <div className="flex flex-col justify-end gap-2">
-            <Button
-              type="button"
-              className="w-full"
-              icon={<RefreshCw className="h-4 w-4" />}
-              onClick={() => void onConsultarResumen()}
-              disabled={resumenLoading}
-            >
-              {resumenLoading ? 'Consultando…' : 'Consultar montos'}
-            </Button>
-          </div>
-        </div>
+      <SelectorVista activa={vista} onCambiar={cambiarVista} idBase={idBase} />
 
-        {resumenData?.montos_fmt && (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/80">
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Concepto</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Monto
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">Total ganado</td>
-                  <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">
-                    {resumenData.montos_fmt.total_ganado}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">Depósito CNS (10% T.G.)</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">
-                    {resumenData.montos_fmt.deposito_cns}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">Aportes gestora 19.92%</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">
-                    {resumenData.montos_fmt.aportes_gestora}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">Aporte solidario gestora</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">
-                    {resumenData.montos_fmt.aporte_solidario}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                    Planilla MDT ({resumenData.mes_nombre} {resumenData.anio})
-                  </td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">
-                    {resumenData.montos_fmt.planilla_mdt}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-gray-700 dark:text-gray-300">Seprec registro poder</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">
-                    {resumenData.montos_fmt.seprec}
-                  </td>
-                </tr>
-                <tr className="bg-gray-50 font-semibold dark:bg-gray-800/60">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Total aportes a pagar</td>
-                  <td className="px-3 py-2 text-right text-gray-900 dark:text-white">
-                    {resumenData.montos_fmt.total_aportes}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            icon={<Eye className="h-4 w-4" />}
-            onClick={() => void onResumenPdfPreview()}
-            disabled={resumenPdfLoading || !empresaResumenId || !mesResumen}
-          >
-            {resumenPdfLoading ? 'PDF…' : 'Ver PDF'}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            icon={<Download className="h-4 w-4" />}
-            onClick={() => void onDescargarResumenPdf()}
-            disabled={resumenPdfLoading || !empresaResumenId || !mesResumen}
-          >
-            Descargar PDF
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          <Building2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
-          Los importes provienen de las declaraciones mensuales cargadas por módulo (incluyendo Ministerio: Total
-          ganado, Planilla MDT mensual y SEPREC); el PDF usa logo, cuenta bancaria y datos de contacto de la
-          configuración de la consultora.
-        </p>
-      </Card>
-
-      <Card title="Filtros" subtitle="Parametriza el reporte y ejecuta búsqueda" gradient>
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <div className="min-w-0 space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo</label>
-              <select
-                value={tipoDeclaracion}
-                onChange={(e) => setTipoDeclaracion(e.target.value)}
-                className="input w-full min-w-0 py-2.5"
-              >
-                <option value="mensual">Declaración mensual</option>
-                <option value="aguinaldo">Declaración aguinaldo</option>
-                <option value="otros_documentos">Otros documentos (empresa)</option>
-                <option value="todos">Todos</option>
-              </select>
-            </div>
-            <div className="min-w-0 space-y-2 sm:col-span-2 lg:col-span-1 xl:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Empresa cliente</label>
-              <select
-                value={empresaFiltroId}
-                onChange={(e) => setEmpresaFiltroId(e.target.value)}
-                className="input w-full min-w-0 max-w-full py-2.5"
-              >
-                <option value="">Todas</option>
-                {empresasCliente.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombre || e.razon_social || `Empresa #${e.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-0">
-              {tipoDeclaracion !== 'aguinaldo' ? (
-                <Input
-                  label={tipoDeclaracion === 'otros_documentos' ? 'Mes de subida' : 'Mes gestión'}
-                  type="month"
-                  value={mesGestion}
-                  onChange={(e) => setMesGestion(e.target.value)}
-                />
-              ) : (
-                <Input
-                  label="Año"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={anioGestion}
-                  onChange={(e) => setAnioGestion(Number(e.target.value || new Date().getFullYear()))}
-                />
-              )}
-            </div>
-            {tipoDeclaracion === 'mensual' ? (
-              <div className="min-w-0 space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</label>
-                <select value={modulo} onChange={(e) => setModulo(e.target.value)} className="input w-full min-w-0 py-2.5">
-                  <option value="">Todos</option>
-                  <option value="afp">AFP</option>
-                  <option value="caja">CAJA</option>
-                  <option value="ministerio">Ministerio</option>
-                </select>
-              </div>
-            ) : tipoDeclaracion === 'otros_documentos' ? (
-              <div className="min-w-0 space-y-2 sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Módulo</span>
-                <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-                  Filtra por empresa y mes calendario en que se subió el PDF (misma sección que en personal del
-                  colaborador).
-                </p>
-              </div>
-            ) : null}
-          </div>
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
-            <Button type="button" className="w-full min-h-[44px] sm:w-auto sm:min-w-[10rem]" onClick={() => void load()}>
-              Buscar
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full min-h-[44px] sm:w-auto sm:min-w-[10rem]"
-              icon={<Download className="h-4 w-4" />}
-              onClick={() => void onExportPdf()}
-              disabled={exporting || tipoDeclaracion !== 'mensual'}
-            >
-              {exporting ? 'Exportando…' : 'Exportar PDF'}
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <Card
-        title="Documentos encontrados"
-        subtitle={`${rows.length} archivo(s) · ${formatBytes(totalSize)} total`}
-        gradient
-      >
-        {loading ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Cargando…</p>
-        ) : rows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Sin resultados para los filtros actuales.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/80">
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Empresa</th>
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Mes</th>
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Módulo</th>
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Archivo</th>
-                  <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500">Tamaño</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {rows.map((r) => (
-                  <tr key={`${r.tipo_declaracion || 'mensual'}-${r.id}`} className="bg-white dark:bg-gray-900/30">
-                    <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.empresa_nombre || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{r.periodo_label || r.mes_gestion}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-700 dark:text-gray-300">{etiquetaModuloReporte(r)}</td>
-                    <td className="max-w-[14rem] truncate px-3 py-2.5 text-gray-700 dark:text-gray-300">
-                      {r.nombre_original}
-                      {r.descripcion ? (
-                        <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{r.descripcion}</span>
-                      ) : null}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-500 dark:text-gray-400">{formatBytes(r.tamano_bytes)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                      <div className="inline-flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void onPreview(r)}
-                          disabled={previewLoadingId === r.id}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onDescargarDocumento(r)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-50 dark:border-gray-600 dark:text-primary-300 dark:hover:bg-gray-800"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Descargar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      <Modal
-        isOpen={Boolean(preview)}
-        onClose={onClosePreview}
-        title={preview?.title || 'Vista previa'}
-        size="xl"
-        bodyClassName="p-0"
-      >
-        {preview?.url ? (
-          <iframe title={preview.title} src={preview.url} className="h-[75vh] w-full border-0 bg-gray-100" />
-        ) : (
-          <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
-            <FileText className="mb-2 h-5 w-5" />
-            Sin vista previa.
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={Boolean(resumenPreview)}
-        onClose={onCloseResumenPreview}
-        title={resumenPreview?.title || 'Resumen PDF'}
-        size="xl"
-        bodyClassName="p-0"
-      >
-        {resumenPreview?.url ? (
-          <iframe title={resumenPreview.title} src={resumenPreview.url} className="h-[75vh] w-full border-0 bg-gray-100" />
-        ) : (
-          <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
-            <FileText className="mb-2 h-5 w-5" />
-            Sin vista previa.
-          </div>
-        )}
-      </Modal>
+      {VISTAS.map((v) => (
+        <section
+          key={v.id}
+          role="tabpanel"
+          id={`${idBase}-panel-${v.id}`}
+          aria-labelledby={`${idBase}-tab-${v.id}`}
+          hidden={v.id !== vista}
+          className="rounded-2xl border border-gray-200/80 bg-white/90 p-4 shadow-soft dark:border-gray-700/80 dark:bg-gray-900/50 sm:p-6"
+        >
+          {v.id === VISTA_CARTA ? <CartaAportesMes reportes={reportes} empresas={empresas} /> : <DocumentosReporte reportes={reportes} empresas={empresas} />}
+        </section>
+      ))}
     </div>
   )
 }

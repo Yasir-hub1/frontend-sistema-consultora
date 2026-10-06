@@ -318,6 +318,18 @@ export const colaboradorService = {
     }
   },
 
+  async actualizarGestoraLote(empresaClienteId, payload) {
+    try {
+      const response = await patch(`/colaborador/empresas-cliente/${empresaClienteId}/gestora/periodo`, payload)
+      if (response.data.success) {
+        return { success: true, data: response.data.data, message: response.data.message }
+      }
+      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
+    }
+  },
+
   async getPersonal(empresaClienteId, personalId) {
     try {
       const response = await get(`/colaborador/empresas-cliente/${empresaClienteId}/personal/${personalId}`)

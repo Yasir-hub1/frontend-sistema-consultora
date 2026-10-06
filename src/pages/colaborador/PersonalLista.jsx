@@ -29,6 +29,7 @@ import DeclaracionExcelPreview, {
   parseDeclaracionExcelBlob,
 } from '../../components/colaborador/DeclaracionExcelPreview'
 import GestoraPersonalPanel from '../../components/colaborador/GestoraPersonalPanel'
+import DocumentosEmpresaModal from '../../components/colaborador/DocumentosEmpresaModal'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
@@ -283,6 +284,11 @@ function NotaArchivoExistente({ nombre, onVer }) {
   )
 }
 
+const PESTANAS = [
+  // { id: 'directorio', label: 'Directorio' },
+  { id: 'gestora', label: 'Gestora' },
+]
+
 export default function ColaboradorPersonalLista() {
   const { user } = useAuth()
   const { empresaId } = useParams()
@@ -342,12 +348,6 @@ export default function ColaboradorPersonalLista() {
   const [aguiPreviewLoadingId, setAguiPreviewLoadingId] = useState(null)
 
   const [otrosDocsModalOpen, setOtrosDocsModalOpen] = useState(false)
-  const [otrosDocsRows, setOtrosDocsRows] = useState([])
-  const [otrosDocsLoading, setOtrosDocsLoading] = useState(false)
-  const [otrosDocFile, setOtrosDocFile] = useState(null)
-  const [otrosDocDescripcion, setOtrosDocDescripcion] = useState('')
-  const [otrosDocUploading, setOtrosDocUploading] = useState(false)
-  const [otrosDocPreviewLoadingId, setOtrosDocPreviewLoadingId] = useState(null)
 
   const closeDeclModal = () => {
     setDeclModalOpen(false)
@@ -613,72 +613,6 @@ export default function ColaboradorPersonalLista() {
     }
   }
 
-  useEffect(() => {
-    if (!otrosDocsModalOpen) return
-    let c = false
-    ;(async () => {
-      setOtrosDocsLoading(true)
-      const res = await colaboradorService.listOtrosDocumentosEmpresa(empresaId)
-      if (!c && res.success) setOtrosDocsRows(res.data?.items ?? [])
-      if (!c) setOtrosDocsLoading(false)
-    })()
-    return () => {
-      c = true
-    }
-  }, [otrosDocsModalOpen, empresaId])
-
-  const closeOtrosDocsModal = () => {
-    setOtrosDocsModalOpen(false)
-    setOtrosDocFile(null)
-    setOtrosDocDescripcion('')
-  }
-
-  const onSubirOtroDocumento = async () => {
-    if (!otrosDocFile) {
-      toast.error('Selecciona un PDF.')
-      return
-    }
-    if (!isPdfFile(otrosDocFile)) {
-      toast.error('Solo se permiten archivos PDF.')
-      return
-    }
-    setOtrosDocUploading(true)
-    const res = await colaboradorService.subirOtroDocumentoEmpresa(empresaId, otrosDocFile, otrosDocDescripcion)
-    setOtrosDocUploading(false)
-    if (res.success) {
-      toast.success('Documento guardado.')
-      setOtrosDocFile(null)
-      setOtrosDocDescripcion('')
-      const list = await colaboradorService.listOtrosDocumentosEmpresa(empresaId)
-      if (list.success) setOtrosDocsRows(list.data?.items ?? [])
-    } else {
-      toast.error(res.message || 'No se pudo guardar.')
-    }
-  }
-
-  const onPreviewOtroDocumento = async (row) => {
-    setOtrosDocPreviewLoadingId(row.id)
-    const res = await colaboradorService.fetchOtroDocumentoEmpresaVistaPreviaBlob(empresaId, row.id)
-    setOtrosDocPreviewLoadingId(null)
-    if (!res.success || !res.blob?.size) {
-      toast.error(res.message || 'No se pudo mostrar la vista previa.')
-      return
-    }
-    setPreview((prev) => {
-      if (prev?.url) URL.revokeObjectURL(prev.url)
-      const url = URL.createObjectURL(res.blob)
-      return { url, kind: 'pdf', title: row.nombre_original }
-    })
-  }
-
-  const onDownloadOtroDocumento = async (row) => {
-    try {
-      await colaboradorService.descargarOtroDocumentoEmpresa(empresaId, row.id, row.nombre_original)
-    } catch {
-      toast.error('No se pudo descargar.')
-    }
-  }
-
   const declHistorialPorMes = agruparDeclaracionesPorMes(declRows)
 
   useEffect(() => {
@@ -775,6 +709,13 @@ export default function ColaboradorPersonalLista() {
     setContactosReferencia([''])
     limpiarArchivosLegajo()
     closeRegistroLegajoPreview()
+  }
+
+  const abrirRegistroMasivo = () => {
+    setMsg(null)
+    setResumenMasivo(null)
+    setArchivoMasivo(null)
+    setMasivoModalOpen(true)
   }
 
   const abrirAlta = () => {
@@ -937,6 +878,7 @@ export default function ColaboradorPersonalLista() {
       : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, total)} de ${total}`
 
   const sinPersonal = !loading && !search && stats.total_personal === 0
+  const esGestora = pestana === 'gestora'
   const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
   return (
@@ -975,17 +917,12 @@ export default function ColaboradorPersonalLista() {
             )}
           </div>
         </div>
-        {canRegistrarPersonal ? (
+        {esGestora ? null : canRegistrarPersonal ? (
           <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setMsg(null)
-                setResumenMasivo(null)
-                setArchivoMasivo(null)
-                setMasivoModalOpen(true)
-              }}
+              onClick={abrirRegistroMasivo}
               icon={<Download className="h-4 w-4" />}
               className="w-full sm:w-auto"
             >
@@ -1008,7 +945,7 @@ export default function ColaboradorPersonalLista() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className={clsx('grid grid-cols-1 gap-3 sm:grid-cols-2', esGestora && 'hidden')}>
         <div
           className={`group rounded-2xl border border-gray-200/80 bg-white/90 p-4 shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-soft-lg dark:border-gray-700/80 dark:bg-gray-900/50 ${motionStagger}`}
           style={{ animationDelay: `${staggerDelayMs(1)}ms` }}
@@ -1050,11 +987,8 @@ export default function ColaboradorPersonalLista() {
         </div>
       )}
 
-      <div role="tablist" aria-label="Vistas de personal" className="flex flex-wrap gap-2">
-        {[
-          // { id: 'directorio', label: 'Directorio' },
-          { id: 'gestora', label: 'Gestora' },
-        ].map((tab) => (
+      <div role="tablist" aria-label="Vistas de personal" className={clsx('flex flex-wrap gap-2', PESTANAS.length < 2 && 'hidden')}>
+        {PESTANAS.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -1077,8 +1011,11 @@ export default function ColaboradorPersonalLista() {
         <GestoraPersonalPanel
           empresaId={empresaId}
           canEdit={canEditarLegajo}
+          canRegistrar={canRegistrarPersonal}
           version={gestoraVersion}
           onEditarLegajo={abrirEdicionLegajo}
+          onRegistrar={abrirAlta}
+          onRegistroMasivo={abrirRegistroMasivo}
         />
       ) : (
       <Card title="Directorio de personal" subtitle={rangeLabel} gradient>
@@ -1299,133 +1236,11 @@ export default function ColaboradorPersonalLista() {
       </Card>
       )}
 
-      <Modal
-        isOpen={otrosDocsModalOpen}
-        onClose={closeOtrosDocsModal}
-        title="Otros documentos de la empresa"
-        size="lg"
-        overlayClassName="animate-fade-in bg-black/55 backdrop-blur-sm motion-reduce:animate-none"
-        className="animate-scale-in rounded-2xl motion-reduce:animate-none"
-        bodyClassName="p-4 sm:p-6 max-h-[85vh] overflow-y-auto"
-      >
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Subí PDFs generales de esta empresa cliente (no están ligados a un empleado concreto). La descripción es
-          opcional y ayuda a identificar el archivo. Podés ver y descargar cada documento como en el resto del portal.
-        </p>
-        {canGestionarOtrosDocumentos ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-            <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-400">Archivo PDF</label>
-            <input
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null
-                if (f && !isPdfFile(f)) {
-                  toast.error('Solo se permiten archivos PDF.')
-                  e.target.value = ''
-                  setOtrosDocFile(null)
-                  return
-                }
-                setOtrosDocFile(f)
-              }}
-              className="input w-full py-2.5 text-sm"
-            />
-            <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Descripción (opcional)
-            </label>
-            <textarea
-              value={otrosDocDescripcion}
-              onChange={(e) => setOtrosDocDescripcion(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Ej. Convenio marco 2024, comunicado interno…"
-              className="input min-h-[5rem] w-full resize-y py-2.5 text-sm"
-            />
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                onClick={() => void onSubirOtroDocumento()}
-                loading={otrosDocUploading}
-                disabled={!otrosDocFile}
-                icon={<Upload className="h-4 w-4" />}
-              >
-                Subir documento
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">
-            No tienes permiso para subir en esta sección.
-          </p>
-        )}
-        <div className="mt-6">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Documentos cargados
-          </p>
-          {otrosDocsLoading ? (
-            <p className="py-8 text-center text-sm text-gray-500">Cargando…</p>
-          ) : otrosDocsRows.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-700">
-              Aún no hay documentos en esta lista.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-              <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800/90">
-                  <tr>
-                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Archivo</th>
-                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Descripción</th>
-                    <th className="px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-200">Tamaño</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-200">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900/30">
-                  {otrosDocsRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="max-w-[12rem] px-3 py-2.5">
-                        <span className="font-medium text-gray-900 dark:text-white">{row.nombre_original}</span>
-                      </td>
-                      <td className="max-w-[14rem] px-3 py-2.5 text-gray-600 dark:text-gray-300">
-                        {row.descripcion ? (
-                          <span className="line-clamp-2 text-sm">{row.descripcion}</span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-gray-600 dark:text-gray-400">
-                        {formatBytes(row.tamano_bytes)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                        <div className="inline-flex flex-wrap justify-end gap-1">
-                          <button
-                            type="button"
-                            title="Vista previa"
-                            disabled={otrosDocPreviewLoadingId === row.id}
-                            onClick={() => void onPreviewOtroDocumento(row)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver
-                          </button>
-                          <button
-                            type="button"
-                            title="Descargar"
-                            onClick={() => void onDownloadOtroDocumento(row)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-primary-200 px-2.5 py-1.5 text-xs font-semibold text-primary-800 transition hover:bg-primary-50 dark:border-primary-800 dark:text-primary-200 dark:hover:bg-primary-950/40"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            Descargar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Modal>
+      <DocumentosEmpresaModal
+        empresa={otrosDocsModalOpen ? { id: Number(empresaId), nombre: nombreEmpresa } : null}
+        canSubirOtros={canGestionarOtrosDocumentos}
+        onClose={() => setOtrosDocsModalOpen(false)}
+      />
 
       <Modal
         isOpen={declModalOpen}

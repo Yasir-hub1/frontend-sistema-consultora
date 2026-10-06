@@ -1,38 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
-import {
-  Briefcase,
-  Building2,
-  ExternalLink,
-  Mail,
-  MapPin,
-  Search,
-  Shield,
-  Users,
-} from 'lucide-react'
+import { ArrowRight, Briefcase, FolderOpen, Mail, MapPin, Phone, Search, X } from 'lucide-react'
 import Card from '../common/Card'
 import Pagination from '../common/Pagination'
+import DocumentosEmpresaModal, { CAMPO_LEGALES, CAMPO_OTROS } from './DocumentosEmpresaModal'
+import { CATALOGO_LEGAL, MedidorLegal } from './DocumentosLegalesEmpresa'
+import { useAuth } from '../../contexts/AuthContext'
 import { colaboradorService } from '../../services/colaboradorService'
+import {
+  colaboradorPuedeGestionarDocumentosLegalesMiEmpresa,
+  colaboradorPuedeGestionarOtrosDocumentosEmpresa,
+} from '../../utils/colaboradorPermisos'
 import { PAGINATION_CONFIG } from '../../utils/constants'
 import { staggerDelayMs } from './ColaboradorShell'
 
 const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
-
-function portalBadge(habilitado) {
-  if (habilitado) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-600/15 dark:bg-emerald-900/30 dark:text-emerald-200">
-        Portal activo
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 dark:bg-gray-800 dark:text-gray-300">
-      Sin portal
-    </span>
-  )
-}
+const RUTA_EMPRESAS = '/colaborador/empresas'
+const encabezadoColumna = 'whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400'
 
 function displayNombre(r) {
   return r.nombre ?? r.razon_social ?? '—'
@@ -42,10 +27,252 @@ function displayCorreo(r) {
   return r.correo_empresa ?? r.correo_contacto ?? null
 }
 
+function displayUbicacion(r) {
+  return [r.ciudad, r.departamento].filter(Boolean).join(' · ')
+}
+
+function rutaPersonal(r) {
+  return `${RUTA_EMPRESAS}/${r.id}/personal`
+}
+
+function conteo(r, campo) {
+  return Number(r[campo]) || 0
+}
+
+function plural(n, singular, varios) {
+  return `${n} ${n === 1 ? singular : varios}`
+}
+
+function resumenCartera(stats, total) {
+  if (typeof stats.asignadas === 'number') return `${plural(stats.asignadas, 'empresa asignada', 'empresas asignadas')} a tu usuario`
+  if (typeof stats.en_cartera === 'number') return `${plural(stats.en_cartera, 'empresa', 'empresas')} en la cartera de tu consultora`
+  return plural(total, 'empresa', 'empresas')
+}
+
+function EstadoPortal({ activo }) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium',
+        activo ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'
+      )}
+    >
+      <span aria-hidden="true" className={clsx('h-1.5 w-1.5 rounded-full', activo ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600')} />
+      {activo ? 'Portal activo' : 'Sin portal'}
+    </span>
+  )
+}
+
+function NombreEmpresa({ empresa }) {
+  const razonDistinta = empresa.razon_social && empresa.nombre && empresa.razon_social !== empresa.nombre
+  return (
+    <div className="min-w-0">
+      <Link
+        to={rutaPersonal(empresa)}
+        className="text-[15px] font-semibold leading-snug text-gray-900 hover:text-primary-700 hover:underline focus-visible:underline focus-visible:outline-none dark:text-white dark:hover:text-primary-300"
+      >
+        {displayNombre(empresa)}
+      </Link>
+      {razonDistinta ? <p className="truncate text-xs text-gray-500 dark:text-gray-400">{empresa.razon_social}</p> : null}
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-mono text-xs tabular-nums text-gray-500 dark:text-gray-400">NIT {empresa.nit ?? '—'}</span>
+        <EstadoPortal activo={empresa.acceso_portal_habilitado === true} />
+      </p>
+    </div>
+  )
+}
+
+function Contacto({ empresa }) {
+  const correo = displayCorreo(empresa)
+  const ubicacion = displayUbicacion(empresa)
+  if (!correo && !empresa.telefono && !ubicacion) return <span className="text-gray-400">—</span>
+  return (
+    <ul className="min-w-0 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+      {ubicacion ? (
+        <li className="flex items-center gap-1.5">
+          <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <span className="truncate">{ubicacion}</span>
+        </li>
+      ) : null}
+      {correo ? (
+        <li className="flex items-center gap-1.5">
+          <Mail aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <span className="truncate">{correo}</span>
+        </li>
+      ) : null}
+      {empresa.telefono ? (
+        <li className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+          <Phone aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          {empresa.telefono}
+        </li>
+      ) : null}
+    </ul>
+  )
+}
+
+function ResumenDocumentos({ empresa, verLegales }) {
+  const legales = conteo(empresa, CAMPO_LEGALES)
+  const otros = conteo(empresa, CAMPO_OTROS)
+  const total = CATALOGO_LEGAL.length
+  return (
+    <div className="w-40 space-y-1.5">
+      {verLegales ? (
+        <div>
+          <p className="flex items-baseline justify-between text-xs">
+            <span className="font-medium text-gray-700 dark:text-gray-200">Legales</span>
+            <span className={clsx('font-semibold tabular-nums', legales === total ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300')}>
+              {legales} de {total}
+            </span>
+          </p>
+          <MedidorLegal cargados={legales} className="mt-1" />
+        </div>
+      ) : null}
+      <p className="text-xs text-gray-600 dark:text-gray-400">{plural(otros, 'otro documento', 'otros documentos')}</p>
+    </div>
+  )
+}
+
+function AccionesEmpresa({ empresa, onDocumentos, className }) {
+  const base =
+    'inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900'
+  return (
+    <div className={clsx('flex gap-2', className)}>
+      <button
+        type="button"
+        onClick={() => onDocumentos(empresa)}
+        aria-label={`Documentos de ${displayNombre(empresa)}`}
+        className={clsx(
+          base,
+          'flex-1 border border-gray-200 bg-white text-gray-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-800',
+          'dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-950/40 dark:hover:text-primary-200 md:flex-none'
+        )}
+      >
+        <FolderOpen aria-hidden="true" className="h-4 w-4" />
+        Documentos
+      </button>
+      <Link to={rutaPersonal(empresa)} className={clsx(base, 'flex-1 bg-primary-600 text-white hover:bg-primary-700 md:flex-none')}>
+        Ver personal
+        <ArrowRight aria-hidden="true" className="h-4 w-4" />
+      </Link>
+    </div>
+  )
+}
+
+function FilasCargando({ cantidad }) {
+  return (
+    <div aria-busy="true" aria-label="Cargando empresas" className="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-700">
+      {Array.from({ length: cantidad }, (_, i) => (
+        <div key={i} className="flex items-center gap-4 px-4 py-5">
+          <div className="flex-1 space-y-2">
+            <div className="h-3.5 w-2/5 animate-pulse rounded bg-gray-100 motion-reduce:animate-none dark:bg-gray-800" />
+            <div className="h-3 w-1/4 animate-pulse rounded bg-gray-100 motion-reduce:animate-none dark:bg-gray-800" />
+          </div>
+          <div className="hidden h-9 w-60 animate-pulse rounded-lg bg-gray-100 motion-reduce:animate-none dark:bg-gray-800 sm:block" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SinEmpresas({ asignadas }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-gray-200 py-14 text-center dark:border-gray-700">
+      <Briefcase aria-hidden="true" className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
+      <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+        {asignadas ? 'Acá aparecerán las empresas que te asignen' : 'Acá aparecerán las empresas cliente de tu consultora'}
+      </p>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">
+        {asignadas ? 'El titular de la consultora las asigna desde el detalle de cada empresa cliente.' : 'Registralas desde el módulo de consultora.'}
+      </p>
+    </div>
+  )
+}
+
+function SinResultados({ busqueda, onLimpiar }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-gray-200 py-10 text-center dark:border-gray-700">
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        0 resultados para <span className="font-semibold text-gray-900 dark:text-white">«{busqueda}»</span>. Probá con otro nombre, NIT,
+        correo o ciudad.
+      </p>
+      <button type="button" onClick={onLimpiar} className="text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300">
+        Limpiar búsqueda
+      </button>
+    </div>
+  )
+}
+
+function TarjetasEmpresas({ rows, verLegales, onDocumentos }) {
+  return (
+    <ul className="space-y-3 md:hidden">
+      {rows.map((r, i) => (
+        <li
+          key={r.id}
+          className={clsx(motionStagger, 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50')}
+          style={{ animationDelay: `${staggerDelayMs(i)}ms` }}
+        >
+          <NombreEmpresa empresa={r} />
+          <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+            <Contacto empresa={r} />
+            <ResumenDocumentos empresa={r} verLegales={verLegales} />
+          </div>
+          <AccionesEmpresa empresa={r} onDocumentos={onDocumentos} className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800" />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function TablaEmpresas({ rows, verLegales, onDocumentos }) {
+  return (
+    <div className="hidden overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 md:block">
+      <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-800/90">
+          <tr>
+            <th scope="col" className={encabezadoColumna}>
+              Empresa
+            </th>
+            <th scope="col" className={encabezadoColumna}>
+              Contacto
+            </th>
+            <th scope="col" className={encabezadoColumna}>
+              Documentos
+            </th>
+            <th scope="col" className={clsx(encabezadoColumna, 'text-right')}>
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900/30">
+          {rows.map((r) => (
+            <tr key={r.id} className="align-top transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
+              <td className="max-w-[18rem] px-4 py-4">
+                <NombreEmpresa empresa={r} />
+              </td>
+              <td className="max-w-[16rem] px-4 py-4">
+                <Contacto empresa={r} />
+              </td>
+              <td className="px-4 py-4">
+                <ResumenDocumentos empresa={r} verLegales={verLegales} />
+              </td>
+              <td className="whitespace-nowrap px-4 py-4">
+                <AccionesEmpresa empresa={r} onDocumentos={onDocumentos} className="justify-end" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 /**
  * @param {{ variant?: 'page' | 'embedded' }} props
  */
 export default function EmpresasAsignadasPanel({ variant = 'page' }) {
+  const { user } = useAuth()
+  const verLegales = colaboradorPuedeGestionarDocumentosLegalesMiEmpresa(user)
+  const canSubirOtros = colaboradorPuedeGestionarOtrosDocumentosEmpresa(user)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState(null)
@@ -56,6 +283,7 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
   const [total, setTotal] = useState(0)
   const [lastPage, setLastPage] = useState(1)
   const [stats, setStats] = useState({ asignadas: undefined, en_cartera: undefined })
+  const [empresaDocumentos, setEmpresaDocumentos] = useState(null)
 
   const isEmbedded = variant === 'embedded'
 
@@ -74,11 +302,7 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
   const load = useCallback(async () => {
     setLoading(true)
     setMsg(null)
-    const res = await colaboradorService.listEmpresasAsignadas({
-      page,
-      per_page: perPage,
-      search,
-    })
+    const res = await colaboradorService.listEmpresasAsignadas({ page, per_page: perPage, search })
     if (res.success) {
       const payload = res.data
       const d = payload?.data ?? payload?.items ?? []
@@ -103,287 +327,132 @@ export default function EmpresasAsignadasPanel({ variant = 'page' }) {
     load()
   }, [load])
 
-  const rangeLabel =
-    total === 0
-      ? loading
-        ? 'Cargando…'
-        : 'Sin registros'
-      : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, total)} de ${total}`
+  const actualizarConteo = useCallback((empresaId, campo, cantidad) => {
+    setRows((prev) => {
+      if (!prev.some((r) => r.id === empresaId && conteo(r, campo) !== cantidad)) return prev
+      return prev.map((r) => (r.id === empresaId ? { ...r, [campo]: cantidad } : r))
+    })
+  }, [])
+
+  const abrirDocumentos = useCallback(
+    (r) =>
+      setEmpresaDocumentos({
+        id: r.id,
+        nombre: displayNombre(r),
+        [CAMPO_LEGALES]: conteo(r, CAMPO_LEGALES),
+        [CAMPO_OTROS]: conteo(r, CAMPO_OTROS),
+      }),
+    []
+  )
+  const cerrarDocumentos = useCallback(() => setEmpresaDocumentos(null), [])
+
+  const limpiarBusqueda = () => {
+    setSearchDraft('')
+    setSearch('')
+    setPage(1)
+  }
 
   const sinEmpresas =
     !loading &&
     !search &&
     (stats.asignadas === 0 ||
       stats.en_cartera === 0 ||
-      (stats.asignadas === undefined &&
-        stats.en_cartera === undefined &&
-        total === 0 &&
-        lastPage <= 1))
+      (stats.asignadas === undefined && stats.en_cartera === undefined && total === 0 && lastPage <= 1))
 
-  const statTile =
-    typeof stats.asignadas === 'number'
-      ? {
-          value: stats.asignadas,
-          label: 'Empresas asignadas',
-          hint: 'Activas para tu usuario en esta consultora',
-          icon: Briefcase,
-          iconClass: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-        }
-      : typeof stats.en_cartera === 'number'
-        ? {
-            value: stats.en_cartera,
-            label: 'Empresas en cartera',
-            hint: 'Total registradas bajo tu consultora',
-            icon: Building2,
-            iconClass: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-          }
-        : null
+  const rango = total > 0 ? `Mostrando ${(page - 1) * perPage + 1}–${Math.min(page * perPage, total)} de ${total}` : null
 
-  const StatIcon = statTile?.icon ?? null
+  const encabezado = (
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="min-w-0">
+        <h3 className="card-title">{isEmbedded ? 'Empresas asignadas' : 'Directorio'}</h3>
+        <p className="card-description">{loading && total === 0 ? 'Cargando empresas…' : resumenCartera(stats, total)}</p>
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 sm:w-80">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            placeholder="Nombre, NIT, correo o ciudad"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            className="input w-full pl-10 pr-9"
+            aria-label="Buscar empresas por nombre, NIT, correo o ciudad"
+          />
+          {searchDraft ? (
+            <button
+              type="button"
+              onClick={limpiarBusqueda}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+          Por página
+          <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="input w-auto min-w-[4.5rem] py-2 text-sm">
+            {PAGINATION_CONFIG.PAGE_SIZE_OPTIONS.filter((n) => n <= 50).map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  )
 
-  const personalBase = '/colaborador/empresas'
+  let contenido
+  if (loading) {
+    contenido = <FilasCargando cantidad={Math.min(perPage, 4)} />
+  } else if (sinEmpresas) {
+    contenido = <SinEmpresas asignadas={typeof stats.asignadas === 'number'} />
+  } else if (rows.length === 0) {
+    contenido = <SinResultados busqueda={search} onLimpiar={limpiarBusqueda} />
+  } else {
+    contenido = (
+      <>
+        <TarjetasEmpresas rows={rows} verLegales={verLegales} onDocumentos={abrirDocumentos} />
+        <TablaEmpresas rows={rows} verLegales={verLegales} onDocumentos={abrirDocumentos} />
+        <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">{rango}</p>
+          <Pagination currentPage={page} totalPages={lastPage} onPageChange={setPage} className="flex-col gap-3 sm:flex-row" />
+        </div>
+      </>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      {!isEmbedded && statTile && StatIcon && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div
-            className={`group rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-soft-lg dark:border-gray-700/80 dark:bg-gray-900/50 ${motionStagger}`}
-            style={{ animationDelay: `${staggerDelayMs(0)}ms` }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105 ${statTile.iconClass}`}
-              >
-                <StatIcon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{statTile.value}</p>
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{statTile.label}</p>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-500">{statTile.hint}</p>
-              </div>
-            </div>
-          </div>
-          <div
-            className={`group rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200/60 hover:shadow-soft-lg dark:border-gray-700/80 dark:bg-gray-900/50 dark:hover:border-emerald-900/40 ${motionStagger}`}
-            style={{ animationDelay: `${staggerDelayMs(1)}ms` }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition-transform duration-300 group-hover:scale-105 dark:bg-emerald-900/40 dark:text-emerald-300">
-                <Users className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Personal por empresa</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                  Entra a cada fila para registrar o revisar legajos según tus permisos.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {msg && (
+    <div className="space-y-4">
+      {msg ? (
         <div
           role="status"
           className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100"
         >
           {msg}
         </div>
-      )}
+      ) : null}
 
-      <Card title={isEmbedded ? 'Empresas asignadas' : 'Directorio'} subtitle={rangeLabel} gradient>
-        {isEmbedded && (
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Busca por nombre, NIT, correo o ciudad. Usa la paginación para recorrer listas largas.
-          </p>
-        )}
-
-        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="relative min-w-0 max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              placeholder="Buscar por nombre, NIT, correo o ciudad…"
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              className="input w-full pl-10"
-              aria-label="Buscar empresas"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="colab-emp-per-page" className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-              Por página
-            </label>
-            <select
-              id="colab-emp-per-page"
-              value={perPage}
-              onChange={(e) => setPerPage(Number(e.target.value))}
-              className="input w-auto min-w-[5rem] py-2 text-sm"
-            >
-              {PAGINATION_CONFIG.PAGE_SIZE_OPTIONS.filter((n) => n <= 50).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent motion-reduce:animate-none" />
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Cargando empresas…</p>
-          </div>
-        ) : sinEmpresas ? (
-          <div className="animate-fade-in-up rounded-2xl border border-dashed border-gray-200 bg-gradient-to-b from-gray-50/80 to-white/50 py-14 text-center motion-reduce:animate-none dark:border-gray-700 dark:from-gray-900/40 dark:to-gray-900/20">
-            <Briefcase className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" />
-            <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {typeof stats.asignadas === 'number'
-                ? 'Aún no tienes empresas asignadas'
-                : 'Sin empresas en cartera'}
-            </p>
-            <p className="mx-auto mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">
-              {typeof stats.asignadas === 'number'
-                ? 'Tu titular debe asignarte empresas cliente desde el detalle de cada empresa.'
-                : 'Registra empresas cliente desde el módulo de consultora.'}
-            </p>
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500 dark:border-gray-700">
-            No hay empresas que coincidan con la búsqueda.
-          </p>
-        ) : (
-          <>
-            <ul className="space-y-3 md:hidden">
-              {rows.map((r, i) => {
-                const portalOn = r.acceso_portal_habilitado === true
-                return (
-                  <li
-                    key={r.id}
-                    className={clsx(
-                      motionStagger,
-                      'rounded-xl border border-gray-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-primary-800'
-                    )}
-                    style={{ animationDelay: `${staggerDelayMs(i)}ms` }}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 dark:text-white">{displayNombre(r)}</p>
-                      <p className="mt-0.5 text-xs text-gray-500">NIT {r.nit ?? '—'}</p>
-                      {(r.ciudad || r.departamento) && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          {[r.ciudad, r.departamento].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {displayCorreo(r) && (
-                        <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-gray-500">
-                          <Mail className="h-3.5 w-3.5 shrink-0" />
-                          {displayCorreo(r)}
-                        </p>
-                      )}
-                      <div className="mt-2">{portalBadge(portalOn)}</div>
-                    </div>
-                    <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 dark:border-gray-800">
-                      <Link
-                        to={`${personalBase}/${r.id}/personal`}
-                        className="btn btn-outline btn-sm inline-flex min-h-[44px] items-center justify-center gap-2 sm:min-h-0"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Ver personal
-                      </Link>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-
-            <div className="hidden overflow-x-auto overscroll-x-contain touch-pan-x rounded-xl border border-gray-200 shadow-sm dark:border-gray-700 md:block">
-              <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-800/90">
-                    <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      Empresa
-                    </th>
-                    <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      NIT
-                    </th>
-                    <th scope="col" className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      Ubicación
-                    </th>
-                    <th scope="col" className="min-w-[10rem] px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      Contacto
-                    </th>
-                    <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      Portal
-                    </th>
-                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900 dark:text-gray-100">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900/30">
-                  {rows.map((r) => {
-                    const portalOn = r.acceso_portal_habilitado === true
-                    return (
-                      <tr
-                        key={r.id}
-                        className="transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/50"
-                      >
-                        <td className="max-w-[14rem] px-4 py-3">
-                          <span className="font-medium text-gray-900 dark:text-white">{displayNombre(r)}</span>
-                          {r.razon_social && r.nombre && r.razon_social !== r.nombre && (
-                            <p className="truncate text-xs text-gray-500">{r.razon_social}</p>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">{r.nit ?? '—'}</td>
-                        <td className="max-w-[12rem] px-4 py-3 text-gray-700 dark:text-gray-300">
-                          {[r.ciudad, r.departamento].filter(Boolean).join(' · ') || '—'}
-                        </td>
-                        <td className="max-w-[14rem] px-4 py-3">
-                          <p className="truncate text-gray-700 dark:text-gray-300">{displayCorreo(r) ?? '—'}</p>
-                          {r.telefono && <p className="truncate text-xs text-gray-500">{r.telefono}</p>}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">{portalBadge(portalOn)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <Link
-                            to={`${personalBase}/${r.id}/personal`}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                          >
-                            Personal
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800">
-              <Pagination
-                currentPage={page}
-                totalPages={lastPage}
-                onPageChange={setPage}
-                className="flex-col gap-3 sm:flex-row"
-              />
-            </div>
-          </>
-        )}
+      <Card header={encabezado} gradient hover={false}>
+        {contenido}
       </Card>
 
-      {!isEmbedded && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-          <div className="flex gap-2">
-            <Shield className="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
-            <p>
-              El estado «Portal» indica si la empresa cliente tiene usuario de solo lectura activo; no afecta tu
-              trabajo interno sobre personal y documentos.
-            </p>
-          </div>
-        </div>
-      )}
+      {!isEmbedded ? (
+        <p className="px-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          <span className="font-semibold text-gray-600 dark:text-gray-300">Portal activo</span> significa que la empresa cliente tiene
+          un usuario de solo lectura habilitado. Tu trabajo con su personal y sus documentos sigue igual en ambos casos.
+        </p>
+      ) : null}
+
+      <DocumentosEmpresaModal
+        empresa={empresaDocumentos}
+        verLegales={verLegales}
+        canSubirLegales={verLegales}
+        canSubirOtros={canSubirOtros}
+        onClose={cerrarDocumentos}
+        onCantidad={actualizarConteo}
+      />
     </div>
   )
 }

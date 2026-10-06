@@ -1,40 +1,21 @@
-import ColaboradorMiEmpresaDocumentosPanel from '../../components/colaborador/ColaboradorMiEmpresaDocumentosPanel'
 import EmpresasAsignadasPanel from '../../components/colaborador/EmpresasAsignadasPanel'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
-import { useAuth } from '../../contexts/AuthContext'
-import { colaboradorPuedeGestionarDocumentosLegalesMiEmpresa } from '../../utils/colaboradorPermisos'
+
+const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
 export default function ColaboradorEmpresasAsignadas() {
-  const { user } = useAuth()
-  const puedeDocumentosLegales = colaboradorPuedeGestionarDocumentosLegalesMiEmpresa(user)
-  const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
-
   return (
     <ColaboradorShell className="min-w-0">
       <div className="space-y-6">
-        <div className={`min-w-0 ${motionStagger}`}>
-          <h1 className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-xl font-bold tracking-tight text-transparent sm:text-2xl dark:from-white dark:to-gray-300">
-            Empresas asignadas
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-            Solo verás empresas cliente que el titular te haya asignado. Busca, pagina y entra al personal de cada
-            una.
-            {puedeDocumentosLegales
-              ? ' Los PDF legales de cada empresa (NIT, ROE, etc.) los cargás acá; el cliente solo los ve y descarga en su portal «Mi empresa».'
-              : ''}
+        <header className={`min-w-0 ${motionStagger}`}>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-2xl">Empresas asignadas</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            Las empresas cliente con las que trabajás. En cada una, <strong className="font-semibold text-gray-800 dark:text-gray-200">Ver personal</strong>{' '}
+            abre su personal y <strong className="font-semibold text-gray-800 dark:text-gray-200">Documentos</strong> los PDFs de la empresa.
           </p>
-        </div>
+        </header>
 
-        {puedeDocumentosLegales ? (
-          <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
-            <ColaboradorMiEmpresaDocumentosPanel />
-          </div>
-        ) : null}
-
-        <div
-          className={motionStagger}
-          style={{ animationDelay: `${staggerDelayMs(puedeDocumentosLegales ? 2 : 1)}ms` }}
-        >
+        <div className={motionStagger} style={{ animationDelay: `${staggerDelayMs(1)}ms` }}>
           <EmpresasAsignadasPanel variant="page" />
         </div>
       </div>
