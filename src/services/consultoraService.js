@@ -2,7 +2,7 @@
  * API titular consultora — configuración, equipo, empresas cliente, alertas (Fases 2–4, 9).
  */
 
-import api, { del, get, post, put, patch, upload } from './api'
+import api, { get, post, put, patch, upload } from './api'
 import { MESSAGES, PAGINATION_CONFIG } from '../utils/constants'
 
 function stripEmpty(params) {
@@ -292,63 +292,6 @@ export const consultoraService = {
   async asignarColaboradoresEmpresa(empresaId, payload) {
     try {
       const response = await put(`/consultora/empresas-cliente/${empresaId}/asignaciones`, payload)
-      if (response.data.success) {
-        return { success: true, data: response.data.data, message: response.data.message }
-      }
-      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
-    } catch (error) {
-      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
-    }
-  },
-
-  async listTiposDocumentoCatalogo(params = {}) {
-    try {
-      const queryParams = stripEmpty({
-        modulo: params.modulo,
-        caja_variante: params.caja_variante,
-      })
-      const response = await get('/consultora/catalogos/tipos-documento', queryParams)
-      if (response.data.success) {
-        const raw = response.data.data
-        return { success: true, data: Array.isArray(raw) ? raw : [], message: response.data.message }
-      }
-      return { success: false, message: response.data.message || MESSAGES.ERROR_FETCH, data: [] }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || MESSAGES.ERROR_FETCH,
-        data: [],
-      }
-    }
-  },
-
-  async createTipoDocumentoCatalogo(payload) {
-    try {
-      const response = await post('/consultora/catalogos/tipos-documento', payload)
-      if (response.data.success) {
-        return { success: true, data: response.data.data, message: response.data.message }
-      }
-      return { success: false, message: response.data.message || MESSAGES.ERROR.SERVER_ERROR }
-    } catch (error) {
-      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.SERVER_ERROR }
-    }
-  },
-
-  async updateTipoDocumentoCatalogo(id, payload) {
-    try {
-      const response = await put(`/consultora/catalogos/tipos-documento/${id}`, payload)
-      if (response.data.success) {
-        return { success: true, data: response.data.data, message: response.data.message }
-      }
-      return { success: false, message: response.data.message || MESSAGES.ERROR.UPDATE }
-    } catch (error) {
-      return { success: false, message: error.response?.data?.message || MESSAGES.ERROR.UPDATE }
-    }
-  },
-
-  async deleteTipoDocumentoCatalogo(id) {
-    try {
-      const response = await del(`/consultora/catalogos/tipos-documento/${id}`)
       if (response.data.success) {
         return { success: true, data: response.data.data, message: response.data.message }
       }

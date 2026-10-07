@@ -87,7 +87,6 @@ function buildPermDraft(row) {
   })
   return {
     puede_editar_empresa_cliente: normalizePermisoBool(row.puede_editar_empresa_cliente),
-    puede_declarar_aguinaldo: normalizePermisoBool(row.puede_declarar_aguinaldo),
     puede_gestionar_otros_documentos_empresa: normalizePermisoBool(row.puede_gestionar_otros_documentos_empresa),
     puede_gestionar_documentos_legales_mi_empresa: normalizePermisoBool(row.puede_gestionar_documentos_legales_mi_empresa),
     permisos,
@@ -324,17 +323,12 @@ export default function ConsultoraMiEquipo() {
     }))
   }
 
-  const patchDeclaracionAguinaldo = (valor) => {
-    setPermDraft((d) => ({ ...d, puede_declarar_aguinaldo: Boolean(valor) }))
-  }
-
   const guardarPermisos = async () => {
     if (!permRow) return
     setPermSaving(true)
     setMsg(null)
     const res = await consultoraService.updateColaboradorPermisos(permRow.id, {
       puede_editar_empresa_cliente: normalizePermisoBool(permDraft.puede_editar_empresa_cliente),
-      puede_declarar_aguinaldo: normalizePermisoBool(permDraft.puede_declarar_aguinaldo),
       puede_gestionar_otros_documentos_empresa: normalizePermisoBool(permDraft.puede_gestionar_otros_documentos_empresa),
       puede_gestionar_documentos_legales_mi_empresa: normalizePermisoBool(permDraft.puede_gestionar_documentos_legales_mi_empresa),
       permisos: serializePermisosParaApi(permDraft.permisos),
@@ -349,7 +343,6 @@ export default function ConsultoraMiEquipo() {
               ? {
                   ...r,
                   puede_editar_empresa_cliente: actualizado.puede_editar_empresa_cliente,
-                  puede_declarar_aguinaldo: actualizado.puede_declarar_aguinaldo,
                   puede_gestionar_otros_documentos_empresa: actualizado.puede_gestionar_otros_documentos_empresa,
                   puede_gestionar_documentos_legales_mi_empresa: actualizado.puede_gestionar_documentos_legales_mi_empresa,
                   permisos_por_modulo: actualizado.permisos_por_modulo ?? r.permisos_por_modulo,
@@ -894,12 +887,6 @@ export default function ConsultoraMiEquipo() {
                         label: 'Editar legajo (datos del empleado)',
                         hint: 'Permite editar ficha del trabajador y régimen CAJA en todo el portal colaborador.',
                       },
-                      {
-                        campo: 'puede_declarar_aguinaldo',
-                        checked: permDraft.puede_declarar_aguinaldo,
-                        label: 'Cargar declaración de aguinaldo (empresa)',
-                        hint: 'Independiente de AFP/CAJA/Ministerio: solo habilita la carga anual del PDF de aguinaldo en Personal.',
-                      },
                     ].map(({ campo, checked, label, hint }) => (
                       <label
                         key={campo}
@@ -909,13 +896,7 @@ export default function ConsultoraMiEquipo() {
                           type="checkbox"
                           className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                           checked={checked}
-                          onChange={(e) => {
-                            if (campo === 'puede_declarar_aguinaldo') {
-                              patchDeclaracionAguinaldo(e.target.checked)
-                            } else {
-                              patchPermisoGlobal(campo, e.target.checked)
-                            }
-                          }}
+                          onChange={(e) => patchPermisoGlobal(campo, e.target.checked)}
                         />
                         <span>
                           <span className="font-semibold text-gray-900 dark:text-gray-100">{label}</span>

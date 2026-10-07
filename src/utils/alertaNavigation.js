@@ -17,7 +17,6 @@ export function resolveAlertaPath(alerta, viewerRole) {
   }
 
   const eid = alerta.empresa_id
-  const pid = alerta.personal_id
   const mod = alerta.modulo
 
   if (mod === 'asignacion_empresa' && r === ROLES.COLABORADOR && eid) {
@@ -29,7 +28,7 @@ export function resolveAlertaPath(alerta, viewerRole) {
   }
   if (mod === 'registro_personal') {
     if (r === ROLES.CONSULTORA && eid) return `/consultora/mis-empresas/${eid}`
-    if (r === ROLES.EMPRESA_CLIENTE && pid) return `/empresa-cliente/personal/${pid}`
+    if (r === ROLES.EMPRESA_CLIENTE) return '/empresa-cliente/personal'
   }
   if (mod === 'declaracion_mensual') {
     if (r === ROLES.EMPRESA_CLIENTE) return '/empresa-cliente/declaraciones-mensuales'

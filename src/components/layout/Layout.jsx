@@ -112,7 +112,6 @@ const Layout = () => {
   const consultoraNav = [
     { name: 'Inicio', href: '/consultora/dashboard', icon: Home },
     { name: 'Configuración inicial', href: '/consultora/configuracion', icon: Settings },
-    { name: 'Catálogo documentos', href: '/consultora/catalogo-documentos', icon: FileStack },
     { name: 'Mi equipo', href: '/consultora/mi-equipo', icon: Users },
     { name: 'Mis empresas', href: '/consultora/mis-empresas', icon: Briefcase },
     { name: 'Trámites', href: '/consultora/tramites', icon: ClipboardList },

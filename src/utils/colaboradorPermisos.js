@@ -80,13 +80,6 @@ export function colaboradorPuedeCargarAlgunaDeclaracionMensual(user) {
   return ['afp', 'caja', 'ministerio'].some((m) => colaboradorPuedeCargarDeclaracionMensualEnModulo(user, m))
 }
 
-/** Declaración anual de aguinaldo — solo flag explícito en colaborador. */
-export function colaboradorPuedeCargarDeclaracionAguinaldo(user) {
-  if (!user) return false
-  if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true
-  return normalizePermisoBool(user.colaborador?.puede_declarar_aguinaldo)
-}
-
 export function colaboradorPuedeEditarEmpresaCliente(user) {
   if (!user) return false
   if (normalizeRole(user.rol) === ROLES.CONSULTORA) return true

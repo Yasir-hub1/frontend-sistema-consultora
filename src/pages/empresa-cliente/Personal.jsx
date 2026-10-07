@@ -1,27 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronRight, Search, Users } from 'lucide-react'
+import { Search, Users } from 'lucide-react'
 import Card from '../../components/common/Card'
 import EmpresaClienteShell, { staggerDelayMs } from '../../components/empresa-cliente/EmpresaClienteShell'
 import Pagination from '../../components/common/Pagination'
 import { empresaClienteService } from '../../services/empresaClienteService'
 import { PAGINATION_CONFIG } from '../../utils/constants'
-
-function Badge({ estado }) {
-  const c =
-    estado === 'al_dia'
-      ? 'bg-emerald-100 text-emerald-800 ring-emerald-200/60 dark:bg-emerald-900/35 dark:text-emerald-200 dark:ring-emerald-700/40'
-      : estado === 'pendiente'
-        ? 'bg-amber-100 text-amber-900 ring-amber-200/60 dark:bg-amber-900/35 dark:text-amber-100 dark:ring-amber-700/40'
-        : 'bg-red-100 text-red-800 ring-red-200/60 dark:bg-red-900/35 dark:text-red-200 dark:ring-red-800/40'
-  return (
-    <span
-      className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ring-1 ring-inset transition-transform duration-200 hover:scale-105 motion-reduce:hover:scale-100 ${c}`}
-    >
-      {estado ?? '—'}
-    </span>
-  )
-}
 
 export default function EmpresaClientePersonal() {
   const [rows, setRows] = useState([])
@@ -110,7 +93,7 @@ export default function EmpresaClientePersonal() {
               Personal
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-              Listado de empleados y estado por módulo (solo lectura).
+              Empleados que tu consultora registró para tu empresa (solo lectura).
             </p>
             <p className="mt-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
               <span className="font-medium text-gray-700 dark:text-gray-200">{empresaNombre}</span>
@@ -206,20 +189,6 @@ export default function EmpresaClientePersonal() {
                     {r.nombres} {r.apellidos}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">CI {r.ci ?? '—'} · {r.cargo ?? '—'}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge estado={r.estado_afp ?? r.personal_afp?.estado} />
-                    <Badge estado={r.estado_caja ?? r.personal_caja?.estado} />
-                    <Badge estado={r.estado_ministerio ?? r.personal_ministerio?.estado} />
-                  </div>
-                  <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 dark:border-gray-800">
-                    <Link
-                      to={`/empresa-cliente/personal/${r.id}`}
-                      className="group inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 sm:min-h-0"
-                    >
-                      Ver detalle
-                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  </div>
                 </li>
               ))}
             </ul>
@@ -231,10 +200,6 @@ export default function EmpresaClientePersonal() {
                     <th className="px-4 py-3">Nombre</th>
                     <th className="px-4 py-3">CI</th>
                     <th className="px-4 py-3">Cargo</th>
-                    <th className="px-4 py-3">AFP</th>
-                    <th className="px-4 py-3">CAJA</th>
-                    <th className="px-4 py-3">MT</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900/30">
@@ -248,24 +213,6 @@ export default function EmpresaClientePersonal() {
                       </td>
                       <td className="px-4 py-3">{r.ci}</td>
                       <td className="px-4 py-3">{r.cargo}</td>
-                      <td className="px-4 py-3">
-                        <Badge estado={r.estado_afp ?? r.personal_afp?.estado} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge estado={r.estado_caja ?? r.personal_caja?.estado} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge estado={r.estado_ministerio ?? r.personal_ministerio?.estado} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          to={`/empresa-cliente/personal/${r.id}`}
-                          className="group inline-flex items-center gap-0.5 font-semibold text-primary-600 transition-all hover:underline dark:text-primary-400"
-                        >
-                          Ver detalle
-                          <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-                        </Link>
-                      </td>
                     </tr>
                   ))}
                 </tbody>

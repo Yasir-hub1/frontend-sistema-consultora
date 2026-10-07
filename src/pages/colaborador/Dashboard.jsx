@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Bell, Briefcase, Check, ChevronRight, LayoutDashboard, ShieldCheck, ClipboardList } from 'lucide-react'
+import { Bell, Briefcase, Check, ChevronRight, LayoutDashboard, ClipboardList } from 'lucide-react'
 import EmpresasAsignadasPanel from '../../components/colaborador/EmpresasAsignadasPanel'
 import ColaboradorShell, { staggerDelayMs } from '../../components/colaborador/ColaboradorShell'
 import TramiteResumenCards from '../../components/tramites/TramiteResumenCards'
@@ -74,30 +74,6 @@ export default function ColaboradorDashboard() {
 
   const empresas = data?.empresas_asignadas ?? 0
   const alertasPendientes = data?.alertas_pendientes ?? 0
-  const recordatorios = data?.recordatorios_documentos ?? {}
-  const moduloCards = [
-    {
-      key: 'afp',
-      label: 'AFP',
-      faltantes: Number(recordatorios?.afp?.faltantes || 0),
-      items: Array.isArray(recordatorios?.afp?.items) ? recordatorios.afp.items : [],
-      tone: 'primary',
-    },
-    {
-      key: 'caja',
-      label: 'CAJA',
-      faltantes: Number(recordatorios?.caja?.faltantes || 0),
-      items: Array.isArray(recordatorios?.caja?.items) ? recordatorios.caja.items : [],
-      tone: 'teal',
-    },
-    {
-      key: 'ministerio',
-      label: 'Ministerio de Trabajo',
-      faltantes: Number(recordatorios?.ministerio?.faltantes || 0),
-      items: Array.isArray(recordatorios?.ministerio?.items) ? recordatorios.ministerio.items : [],
-      tone: 'amber',
-    },
-  ]
   const motionStagger = 'animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none'
 
   return (
@@ -207,58 +183,6 @@ export default function ColaboradorDashboard() {
             <TramiteResumenCards resumen={tramiteResumen} basePath="/colaborador/tramites" />
           </div>
         ) : null}
-
-        <div className={`${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(3)}ms` }}>
-          <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/50">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                <ShieldCheck className="h-4 w-4 text-primary-600 dark:text-primary-400" />
-                Recordatorios por documentos faltantes
-              </h2>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {moduloCards.map((m) => (
-                <div key={m.key} className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800/40">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">{m.label}</p>
-                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
-                      {m.faltantes}
-                    </span>
-                  </div>
-                  {m.faltantes === 0 ? (
-                    <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Sin faltantes.</p>
-                  ) : (
-                    <ul className="mt-2 space-y-2">
-                      {m.items.map((it) => (
-                        <li key={`${m.key}-${it.personal_id}`} className="text-xs">
-                          <button
-                            type="button"
-                            onClick={() => navigate(it.path)}
-                            className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-left transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
-                          >
-                            <p className="font-medium text-gray-900 dark:text-white">{it.personal_nombre}</p>
-                            <p className="text-gray-500 dark:text-gray-400">{it.empresa_nombre}</p>
-                          </button>
-                        </li>
-                      ))}
-                      {m.faltantes > m.items.length ? (
-                        <li className="text-xs text-gray-500 dark:text-gray-400">
-                          +{m.faltantes - m.items.length} más
-                        </li>
-                      ) : null}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-            {moduloCards.some((m) => m.faltantes > 0) ? (
-              <p className="mt-3 inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-200">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Revisa y completa documentos en AFP, CAJA y Ministerio.
-              </p>
-            ) : null}
-          </div>
-        </div>
 
         <div className={`${motionStagger}`} style={{ animationDelay: `${staggerDelayMs(3)}ms` }}>
           <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-soft backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/50">

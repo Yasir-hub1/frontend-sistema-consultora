@@ -1,11 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Bell, Briefcase, FileStack, Home, Settings, Users } from 'lucide-react'
+import { Bell, Briefcase, Home, Settings, Users } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
   { to: '/consultora/dashboard', label: 'Inicio', short: 'Inicio', end: true, icon: Home },
   { to: '/consultora/configuracion', label: 'Configuración', short: 'Config', end: false, icon: Settings },
-  { to: '/consultora/catalogo-documentos', label: 'Catálogo', short: 'Catálogo', end: false, icon: FileStack },
   { to: '/consultora/mi-equipo', label: 'Mi equipo', short: 'Equipo', end: false, icon: Users },
   { to: '/consultora/mis-empresas', label: 'Mis empresas', short: 'Empresas', end: false, icon: Briefcase },
   { to: '/consultora/alertas', label: 'Alertas', short: 'Alertas', end: false, icon: Bell },

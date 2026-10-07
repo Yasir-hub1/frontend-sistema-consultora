@@ -22,7 +22,6 @@ import ConsultoraMiEquipo from '../pages/consultora/MiEquipo'
 import ConsultoraMisEmpresas from '../pages/consultora/MisEmpresas'
 import ConsultoraEmpresaDetalle from '../pages/consultora/EmpresaClienteDetalle'
 import ConsultoraAlertas from '../pages/consultora/Alertas'
-import ConsultoraCatalogoDocumentos from '../pages/consultora/CatalogoDocumentos'
 import ConsultoraReportes from '../pages/consultora/Reportes'
 
 import ColaboradorDashboard from '../pages/colaborador/Dashboard'
@@ -36,7 +35,6 @@ import TramiteDetallePage from '../pages/tramites/TramiteDetalle'
 
 import EmpresaClienteDashboard from '../pages/empresa-cliente/Dashboard'
 import EmpresaClientePersonal from '../pages/empresa-cliente/Personal'
-import EmpresaClienteEmpleado from '../pages/empresa-cliente/EmpleadoVista'
 import EmpresaClienteMiConsultora from '../pages/empresa-cliente/MiConsultora'
 import EmpresaClienteMiEmpresa from '../pages/empresa-cliente/MiEmpresa'
 import EmpresaClienteDeclaraciones from '../pages/empresa-cliente/DeclaracionesMensuales'
@@ -112,7 +110,6 @@ const AppRoutes = () => {
         <Route path="mis-empresas" element={<ConsultoraMisEmpresas />} />
         <Route path="mis-empresas/:empresaId" element={<ConsultoraEmpresaDetalle />} />
         <Route path="alertas" element={<ConsultoraAlertas />} />
-        <Route path="catalogo-documentos" element={<ConsultoraCatalogoDocumentos />} />
         <Route path="reportes" element={<ConsultoraReportes />} />
         <Route path="tramites" element={<TramitesListaPage />} />
         <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
@@ -157,7 +154,7 @@ const AppRoutes = () => {
         <Route path="otros-documentos" element={<EmpresaClienteOtrosDocumentos />} />
         <Route path="mi-empresa" element={<EmpresaClienteMiEmpresa />} />
         <Route path="personal" element={<EmpresaClientePersonal />} />
-        <Route path="personal/:personalId" element={<EmpresaClienteEmpleado />} />
+        <Route path="personal/:personalId" element={<Navigate to="/empresa-cliente/personal" replace />} />
         <Route path="mi-consultora" element={<EmpresaClienteMiConsultora />} />
         <Route path="tramites" element={<TramitesListaPage />} />
         <Route path="tramites/agenda" element={<TramitesAgendaPage />} />
